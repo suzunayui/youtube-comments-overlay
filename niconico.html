@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Niconico Style Comments</title>
+
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: rgba(0,0,0,0); /* 背景透明（OBSブラウザソース向け） */
+    }
+
+    .bullet {
+        position: absolute;
+        white-space: nowrap;
+        font-family: "Yu Gothic", "Meiryo", sans-serif;
+
+        /* 大きめ文字（必要ならここ変えてOK） */
+        font-size: 200px;
+        font-weight: 900;
+
+        color: #ffffff;
+        pointer-events: none;
+
+        /* 太い黒フチ（袋文字） */
+        text-shadow:
+          -5px -5px 0 #000,
+           5px -5px 0 #000,
+          -5px  5px 0 #000,
+           5px  5px 0 #000,
+          -6px  0   0 #000,
+           6px  0   0 #000,
+           0  -6px  0 #000,
+           0   6px  0 #000;
+
+        left: 0; /* 実際の位置は JS で動かす */
+    }
+
+    .bullet img.emoji {
+        height: 1.4em;
+        vertical-align: middle;
+        margin: 0 4px;
+    }
+
+    .bullet img.sticker {
+        height: 200px;
+        vertical-align: middle;
+        margin: 0 6px;
+    }
+</style>
+</head>
+
+<body>
+
+<script>
+let initialized = false;     // ★ 初回「履歴スキップ」モードかどうか
+let seen = new Set();
+
+/* ------------------ 共通ヘルパー ------------------ */
+
+/**
+ * 画像込みで幅・高さを測る
+ */
+function measureSize(div) {
+    return new Promise(resolve => {
+        const imgs = div.querySelectorAll("img");
+        let pending = imgs.length;
+
+        if (pending === 0) {
+            resolve({ width: div.offsetWidth, height: div.offsetHeight });
+            return;
+        }
+
+        imgs.forEach(img => {
+            img.onload = img.onerror = () => {
+                pending--;
+                if (pending === 0) {
+                    resolve({ width: div.offsetWidth, height: div.offsetHeight });
+                }
+            };
+        });
+    });
+}
+
+/**
+ * 「絵文字のみ & 5個以下」かどうか判定
+ */
+function isShortEmojiOnly(msg) {
+    if (!msg || !Array.isArray(msg.parts) || msg.parts.length === 0) return false;
+
+    let emojiCount = 0;
+
+    for (const part of msg.parts) {
+        if (part.type === "emoji") {
+            emojiCount++;
+            continue;
+        }
+        if (part.type === "text") {
+            const t = (part.text || "").trim();
+            if (t.length === 0) {
+                // 空白テキストは無視
+                continue;
+            } else {
+                // 普通の文字が入ってるのでNG
+                return false;
+            }
+        }
+        if (part.type === "sticker") {
+            // スタンプは別扱い（ここでは弾幕側に回す）
+            return false;
+        }
+    }
+
+    if (emojiCount === 0) return false;
+    return emojiCount <= 5;
+}
+
+/* ------------------------------------------------------------
+   絵文字落下（上から落ちて床で跳ねて消える）
+------------------------------------------------------------ */
+function spawnFallingEmoji(msg) {
+    const div = document.createElement("div");
+    div.className = "bullet emoji-drop";
+    const content = document.createElement("span");
+
+    // parts から絵文字だけ再構成（テキストは空白扱い）
+    if (Array.isArray(msg.parts) && msg.parts.length > 0) {
+        for (const part of msg.parts) {
+            if (part.type === "emoji") {
+                const img = document.createElement("img");
+                img.className = "emoji";
+                img.src = part.url;
+                img.alt = part.alt || "";
+                content.append(img);
+            } else if (part.type === "text") {
+                // 無視（空白として扱う）
+                continue;
+            }
+        }
+    } else {
+        // 念のためテキストがある場合
+        content.textContent = msg.text || " ";
+    }
+
+    div.appendChild(content);
+    document.body.appendChild(div);
+
+    measureSize(div).then(size => {
+        const w = window.innerWidth  || 1920;
+        const h = window.innerHeight || 1080;
+
+        // 横位置はランダム
+        const maxX = Math.max(w - size.width, 0);
+        const x = Math.random() * maxX;
+        div.style.left = x + "px";
+
+        // 縦は上から落とす
+        let y = -size.height;
+        let vy = 0;
+        const gravity = 2000;         // px/s^2
+        const floorMargin = 50;       // 床から少し上で止まる
+        const floorY = h - size.height - floorMargin;
+        let bounces = 0;
+        const maxBounces = 2;
+        let fading = false;
+        let fadeStart = 0;
+        const fadeDuration = 0.5;     // 秒
+
+        let lastTime = null;
+
+        function step(timestamp) {
+            if (lastTime === null) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (!fading) {
+                vy += gravity * dt;
+                y += vy * dt;
+
+                if (y >= floorY) {
+                    y = floorY;
+                    if (Math.abs(vy) < 200 || bounces >= maxBounces) {
+                        // ほぼ止まった → フェード開始
+                        fading = true;
+                        fadeStart = performance.now();
+                    } else {
+                        // ぽよんとバウンド
+                        vy = -vy * 0.4; // 減衰
+                        bounces++;
+                    }
+                }
+
+                div.style.top = y + "px";
+            } else {
+                // フェードアウト
+                const t = (timestamp - fadeStart) / 1000;
+                const ratio = Math.min(t / fadeDuration, 1);
+                div.style.opacity = String(1 - ratio);
+                if (ratio >= 1) {
+                    div.remove();
+                    return;
+                }
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        requestAnimationFrame(step);
+    });
+}
+
+/* ------------------------------------------------------------
+   通常のニコニコ弾幕（右→左へ10秒で流れる）
+------------------------------------------------------------ */
+function spawnScrollingBullet(msg) {
+    const div = document.createElement("div");
+    div.className = "bullet";
+    const content = document.createElement("span");
+
+    const rawText = (msg.text || "").trim();
+
+    if (Array.isArray(msg.parts) && msg.parts.length > 0) {
+        for (const part of msg.parts) {
+            if (part.type === "text") {
+                content.append(document.createTextNode(part.text || ""));
+            } else if (part.type === "emoji") {
+                const img = document.createElement("img");
+                img.className = "emoji";
+                img.src = part.url;
+                img.alt = part.alt || "";
+                content.append(img);
+            } else if (part.type === "sticker") {
+                const img = document.createElement("img");
+                img.className = "sticker";
+                img.src = part.url;
+                img.alt = part.alt || "";
+                content.append(img);
+            }
+        }
+    } else {
+        content.textContent = rawText || (msg.author ? msg.author + " さん" : " ");
+    }
+
+    div.appendChild(content);
+    document.body.appendChild(div);
+
+    measureSize(div).then(size => {
+        const w = window.innerWidth  || 1920;
+        const h = window.innerHeight || 1080;
+
+        // --- 上下100px余白を空けて、その間をランダム ---
+        const marginTop = 100;
+        const marginBottom = 100;
+        const usableHeight = Math.max(h - marginTop - marginBottom - size.height, 0);
+        const y = marginTop + Math.random() * usableHeight;
+        div.style.top = y + "px";
+
+        // --- 横スクロール設定 ---
+        let x = w;                // 画面右の外からスタート
+        const endX = -size.width; // コメント右端が左の外へ出た位置
+
+        // ★ どんな長さでも「見えてから消えるまで visibleDuration 秒」
+        const visibleDuration = 10; // 秒（ここ変えると全体速度調整）
+        const speed = (w + size.width) / visibleDuration; // px/sec
+
+        let lastTime = null;
+
+        function step(timestamp) {
+            if (lastTime === null) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            x -= speed * dt;
+            div.style.left = x + "px";
+
+            if (x + size.width < 0) {
+                div.remove();
+                return;
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        requestAnimationFrame(step);
+    });
+}
+
+/* ------------------------------------------------------------
+   コメント取得（/comments → 弾幕に流す）
+   ★ 初めて「コメントが来たバッチ」は履歴扱いでスキップ
+------------------------------------------------------------ */
+async function fetchComments() {
+    try {
+        const res = await fetch("/comments");
+        const data = await res.json();
+
+        let sawAnyInThisBatch = false;
+
+        for (const msg of data) {
+            const id = msg.id || (msg.timestamp_ms + "_" + (msg.author || "") + "_" + (msg.text || ""));
+
+            if (!initialized) {
+                // 初回モード中：履歴として既読扱いのみ
+                seen.add(id);
+                sawAnyInThisBatch = true;
+                continue;
+            }
+
+            if (!seen.has(id)) {
+                seen.add(id);
+                sawAnyInThisBatch = true;
+
+                // ★ 絵文字のみ5個以下 → 落下演出
+                if (isShortEmojiOnly(msg)) {
+                    spawnFallingEmoji(msg);
+                } else {
+                    spawnScrollingBullet(msg);
+                }
+            }
+        }
+
+        if (!initialized && sawAnyInThisBatch) {
+            initialized = true;
+            console.log("NICONICO overlay initialized: history skipped.");
+        }
+
+    } catch (err) {
+        console.error("fetch error:", err);
+    }
+}
+
+/* ポーリング（0.5秒ごと） */
+setInterval(fetchComments, 500);
+fetchComments();
+</script>
+
+</body>
+</html>

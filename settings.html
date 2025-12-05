@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>YouTube Chat Overlay 設定</title>
+<style>
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: "Yu Gothic", "Meiryo", sans-serif;
+    background: #1e1e2f;
+    color: #f5f5f5;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  label {
+    display: block;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    margin-top: 4px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3d;
+    color: #f5f5f5;
+  }
+
+  .buttons {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+  }
+
+  button {
+    flex: 1;
+    padding: 8px 0;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  #btnStart {
+    background: #4caf50;
+    color: #fff;
+  }
+
+  #btnStop {
+    background: #f44336;
+    color: #fff;
+  }
+
+  #status {
+    margin-top: 12px;
+    font-size: 13px;
+  }
+
+  .small {
+    font-size: 11px;
+    color: #ccccff;
+    margin-top: 8px;
+  }
+
+  #launchersBox {
+    margin-top: 12px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #25253a;
+    font-size: 11px;
+  }
+
+  #launchersBox code {
+    background: #333;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+
+  #btnOpenLaunchers {
+    margin-top: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: #3f51b5;
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+  <h1>YouTube Chat Overlay</h1>
+
+  <label>
+    チャンネルID / @ハンドル / 動画ID
+    <input type="text" id="inputTarget" placeholder="@すずなゆい / UCxxxx / abcdefghijk" />
+  </label>
+
+  <div class="buttons">
+    <button id="btnStart">チャット取得開始</button>
+    <button id="btnStop">停止</button>
+  </div>
+
+  <div id="status">ステータス: 停止中</div>
+
+  <div id="launchersBox">
+    <div id="launchersPath">OBS 用ランチャー: 準備中…</div>
+    <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
+    <div class="small">
+      フォルダ内の <code>*.html</code> を OBS のソースリストにドラッグ＆ドロップすると、<br>
+      そのままブラウザソースとして読み込まれます。
+    </div>
+  </div>
+
+  <div class="small">
+    直接 URL で使う場合：<br />
+    ・通常コメント: <code>http://127.0.0.1:5000/</code><br />
+    ・ニコニコ風: <code>http://127.0.0.1:5000/niconico</code><br />
+    ・スパチャ専用: <code>http://127.0.0.1:5000/supers</code>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+
+    const inputTarget = document.getElementById("inputTarget");
+    const btnStart = document.getElementById("btnStart");
+    const btnStop = document.getElementById("btnStop");
+    const statusEl = document.getElementById("status");
+
+    const launchersPathEl = document.getElementById("launchersPath");
+    const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
+
+    const KEY = "yt-overlay-input";
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const saved = localStorage.getItem(KEY);
+      if (saved) {
+        inputTarget.value = saved;
+      }
+    });
+
+    btnStart.addEventListener("click", () => {
+      const v = inputTarget.value.trim();
+      if (!v) {
+        statusEl.textContent = "ステータス: 入力が空です";
+        return;
+      }
+
+      localStorage.setItem(KEY, v);
+
+      statusEl.textContent = "ステータス: 起動中…";
+      ipcRenderer.send("chat:start", v);
+    });
+
+    btnStop.addEventListener("click", () => {
+      ipcRenderer.send("chat:stop");
+      statusEl.textContent = "ステータス: 停止要求を送信しました…";
+    });
+
+    // メインプロセスからのステータス通知
+    ipcRenderer.on("chat:status", (_event, state) => {
+      if (state === "starting") {
+        statusEl.textContent = "ステータス: 起動中…";
+      } else if (state === "stopped") {
+        statusEl.textContent = "ステータス: 停止中";
+      } else {
+        statusEl.textContent = "ステータス: " + state;
+      }
+    });
+
+    ipcRenderer.on("chat:error", (_event, message) => {
+      statusEl.textContent = "ステータス: エラー: " + message;
+    });
+
+    // ランチャーフォルダのパス表示
+    ipcRenderer.on("launchers:path", (_event, dirPath) => {
+      launchersPathEl.textContent = "OBS 用ランチャーフォルダ: " + dirPath;
+    });
+
+    btnOpenLaunchers.addEventListener("click", () => {
+      ipcRenderer.send("launchers:open");
+    });
+  </script>
+</body>
+</html>
