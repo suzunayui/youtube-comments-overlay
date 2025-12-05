@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>Niconico Style Comments</title>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic&family=Hachi+Maru+Pop&family=Klee+One&family=Kosugi+Maru&family=M+PLUS+1p:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
 
 <style>
     html, body {
@@ -15,17 +19,17 @@
     .bullet {
         position: absolute;
         white-space: nowrap;
-        font-family: "Yu Gothic", "Meiryo", sans-serif;
+        font-family: var(--font-family, "Yu Gothic", "Meiryo", sans-serif);
 
-        /* 大きめ文字（必要ならここ変えてOK） */
-        font-size: 200px;
-        font-weight: 900;
+        /* 大きめ文字（設定で変更可能） */
+        font-size: var(--font-size, 200px);
+        font-weight: var(--font-weight, 900);
 
-        color: #ffffff;
+        color: var(--color-text, #ffffff);
         pointer-events: none;
 
         /* 太い黒フチ（袋文字） */
-        text-shadow:
+        text-shadow: var(--text-shadow,
           -5px -5px 0 #000,
            5px -5px 0 #000,
           -5px  5px 0 #000,
@@ -33,7 +37,7 @@
           -6px  0   0 #000,
            6px  0   0 #000,
            0  -6px  0 #000,
-           0   6px  0 #000;
+           0   6px  0 #000);
 
         left: 0; /* 実際の位置は JS で動かす */
     }
@@ -45,7 +49,7 @@
     }
 
     .bullet img.sticker {
-        height: 200px;
+        height: var(--font-size, 200px);
         vertical-align: middle;
         margin: 0 6px;
     }
@@ -57,6 +61,63 @@
 <script>
 let initialized = false;     // ★ 初回「履歴スキップ」モードかどうか
 let seen = new Set();
+
+/* ------------------ 設定取得 ------------------ */
+async function fetchAndApplySettings() {
+    try {
+        const res = await fetch("/settings/nico");
+        const colors = await res.json();
+        const root = document.documentElement;
+
+        // hex色をrgbaに変換するヘルパー
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha / 100})`;
+        }
+
+        root.style.setProperty("--font-family", `"${colors.fontFamily || 'Noto Sans JP'}", "Yu Gothic", "Meiryo", sans-serif`);
+        root.style.setProperty("--color-text", hexToRgba(colors.colorText || "#ffffff", colors.alphaText ?? 100));
+        
+        // ニコニコ風フォントサイズ
+        const fontSize = parseInt(colors.fontSize) || 64;
+        root.style.setProperty("--font-size", fontSize + "px");
+        
+        root.style.setProperty("--font-weight", colors.fontBold !== false ? "900" : "700");
+        
+        // 流れる速度（秒）
+        const scrollDuration = parseFloat(colors.scrollDuration) || 8;
+        root.style.setProperty("--scroll-duration", scrollDuration);
+
+        // シャドウ（袋文字）
+        const shadowEnabled = colors.shadowEnabled !== false;
+        const shadowColor = colors.colorShadow || "#000000";
+        const shadowAlpha = colors.alphaShadow ?? 100;
+        if (shadowEnabled) {
+            const sc = hexToRgba(shadowColor, shadowAlpha);
+            const stroke = Math.max(Math.round(fontSize / 12), 3);
+            root.style.setProperty("--text-shadow", `
+                -${stroke}px -${stroke}px 0 ${sc},
+                 ${stroke}px -${stroke}px 0 ${sc},
+                -${stroke}px  ${stroke}px 0 ${sc},
+                 ${stroke}px  ${stroke}px 0 ${sc},
+                -${stroke+1}px  0   0 ${sc},
+                 ${stroke+1}px  0   0 ${sc},
+                 0  -${stroke+1}px  0 ${sc},
+                 0   ${stroke+1}px  0 ${sc}
+            `);
+        } else {
+            root.style.setProperty("--text-shadow", "none");
+        }
+    } catch (e) {
+        console.error("fetchAndApplySettings error", e);
+    }
+}
+
+// 設定を定期的に取得（2秒ごと）
+setInterval(fetchAndApplySettings, 2000);
+fetchAndApplySettings();
 
 /* ------------------ 共通ヘルパー ------------------ */
 
@@ -261,8 +322,8 @@ function spawnScrollingBullet(msg) {
         let x = w;                // 画面右の外からスタート
         const endX = -size.width; // コメント右端が左の外へ出た位置
 
-        // ★ どんな長さでも「見えてから消えるまで visibleDuration 秒」
-        const visibleDuration = 10; // 秒（ここ変えると全体速度調整）
+        // ★ 設定から流れる時間を取得
+        const visibleDuration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scroll-duration')) || 8;
         const speed = (w + size.width) / visibleDuration; // px/sec
 
         let lastTime = null;

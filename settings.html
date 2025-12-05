@@ -10,26 +10,38 @@
     font-family: "Yu Gothic", "Meiryo", sans-serif;
     background: #1e1e2f;
     color: #f5f5f5;
-    overflow: hidden;
+    overflow-x: hidden;
   }
 
   .container {
     display: flex;
     gap: 12px;
     height: calc(100vh - 24px);
+    overflow: hidden;
   }
 
   .left-panel {
-    flex: 1;
-    min-width: 280px;
+    flex: 0 0 240px;
+    min-width: 200px;
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
   }
 
   .right-panel {
     flex: 1;
-    min-width: 280px;
+    min-width: 0;
     overflow-y: auto;
+  }
+
+  .settings-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .settings-col {
+    flex: 1;
+    min-width: 0;
   }
 
   h1 {
@@ -120,8 +132,8 @@
     padding: 10px;
     background: #25253a;
     border-radius: 8px;
-    height: 100%;
     box-sizing: border-box;
+    margin-bottom: 10px;
   }
 
   .color-settings h2 {
@@ -259,85 +271,137 @@
   </div>
 
   <div class="right-panel">
-    <div class="color-settings">
-      <h2>🎨 オーバーレイ色設定</h2>
+    <div class="settings-row">
+      <!-- オーバーレイ設定 -->
+      <div class="settings-col">
+        <div class="color-settings">
+          <h2>📺 通常オーバーレイ設定</h2>
 
-      <div class="color-category">基本スタイル</div>
-      <div class="color-row">
-        <label>フォント</label>
-        <select id="fontFamily">
-          <optgroup label="— Webフォント (Google Fonts) —">
-            <option value="Noto Sans JP">Noto Sans JP</option>
-            <option value="M PLUS Rounded 1c">M PLUS Rounded 1c</option>
-            <option value="M PLUS 1p">M PLUS 1p</option>
-            <option value="Kosugi Maru">小杉丸ゴシック</option>
-            <option value="Zen Maru Gothic">Zen Maru Gothic</option>
-            <option value="BIZ UDGothic">BIZ UDゴシック</option>
-            <option value="Klee One">Klee One</option>
-            <option value="Yusei Magic">Yusei Magic</option>
-            <option value="Hachi Maru Pop">はちまるポップ</option>
-          </optgroup>
-          <optgroup label="— システムフォント —">
-            <option value="Yu Gothic">游ゴシック</option>
-            <option value="Meiryo">メイリオ</option>
-            <option value="MS Gothic">MS ゴシック</option>
-            <option value="Hiragino Sans">ヒラギノ角ゴ</option>
-            <option value="Arial">Arial</option>
-            <option value="Comic Sans MS">Comic Sans MS</option>
-            <option value="Impact">Impact</option>
-          </optgroup>
-          <optgroup id="installedFontsGroup" label="— インストール済みフォント —">
-          </optgroup>
-        </select>
-      </div>
-      <div class="color-row">
-        <label>通常コメント背景</label>
-        <input type="color" id="colorNormal" value="#000000" />
-        <input type="range" id="alphaNormal" min="0" max="100" value="100" />
-        <span class="alpha-value" id="alphaNormalVal">100%</span>
-      </div>
-      <div class="color-row">
-        <label>文字色</label>
-        <input type="color" id="colorText" value="#ffffff" />
-        <input type="range" id="alphaText" min="0" max="100" value="100" />
-        <span class="alpha-value" id="alphaTextVal">100%</span>
-      </div>
-      <div class="color-row">
-        <label>投稿者名の色</label>
-        <input type="color" id="colorAuthor" value="#ffd8f8" />
-        <input type="range" id="alphaAuthor" min="0" max="100" value="100" />
-        <span class="alpha-value" id="alphaAuthorVal">100%</span>
-      </div>
-      <div class="color-row">
-        <label>フォントサイズ (px)</label>
-        <input type="number" id="fontSize" value="22" min="10" max="48" />
-      </div>
-      <div class="color-row">
-        <label>太字 (ボールド)</label>
-        <input type="checkbox" id="fontBold" checked />
-        <span style="font-size:11px; margin-left:4px;">有効</span>
-      </div>
-      <div class="color-row">
-        <label>文字の影</label>
-        <input type="checkbox" id="shadowEnabled" checked />
-        <span style="font-size:11px; margin-left:4px;">有効</span>
-      </div>
-      <div class="color-row">
-        <label>影の色</label>
-        <input type="color" id="colorShadow" value="#000000" />
-        <input type="range" id="alphaShadow" min="0" max="100" value="90" />
-        <span class="alpha-value" id="alphaShadowVal">90%</span>
-      </div>
-
-      <div class="color-category">メンバーシップ / ギフト</div>
-      <div class="color-row">
-        <label>メンバーシップ系背景</label>
-        <input type="color" id="colorMembership" value="#1e7d32" />
-        <input type="range" id="alphaMembership" min="0" max="100" value="100" />
-        <span class="alpha-value" id="alphaMembershipVal">100%</span>
+          <div class="color-row">
+            <label>フォント</label>
+            <select id="fontFamily">
+              <optgroup label="— Webフォント —">
+                <option value="Noto Sans JP">Noto Sans JP</option>
+                <option value="M PLUS Rounded 1c">M PLUS Rounded 1c</option>
+                <option value="M PLUS 1p">M PLUS 1p</option>
+                <option value="Kosugi Maru">小杉丸ゴシック</option>
+                <option value="Zen Maru Gothic">Zen Maru Gothic</option>
+                <option value="BIZ UDGothic">BIZ UDゴシック</option>
+                <option value="Klee One">Klee One</option>
+                <option value="Yusei Magic">Yusei Magic</option>
+                <option value="Hachi Maru Pop">はちまるポップ</option>
+              </optgroup>
+              <optgroup label="— システムフォント —">
+                <option value="Yu Gothic">游ゴシック</option>
+                <option value="Meiryo">メイリオ</option>
+                <option value="MS Gothic">MS ゴシック</option>
+                <option value="Arial">Arial</option>
+              </optgroup>
+              <optgroup id="installedFontsGroup" label="— インストール済み —">
+              </optgroup>
+            </select>
+          </div>
+          <div class="color-row">
+            <label>背景色</label>
+            <input type="color" id="colorNormal" value="#000000" />
+            <input type="range" id="alphaNormal" min="0" max="100" value="100" />
+            <span class="alpha-value" id="alphaNormalVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>文字色</label>
+            <input type="color" id="colorText" value="#ffffff" />
+            <input type="range" id="alphaText" min="0" max="100" value="100" />
+            <span class="alpha-value" id="alphaTextVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>投稿者名</label>
+            <input type="color" id="colorAuthor" value="#ffd8f8" />
+            <input type="range" id="alphaAuthor" min="0" max="100" value="100" />
+            <span class="alpha-value" id="alphaAuthorVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>サイズ (px)</label>
+            <input type="number" id="fontSize" value="22" min="10" max="48" />
+          </div>
+          <div class="color-row">
+            <label>太字</label>
+            <input type="checkbox" id="fontBold" checked />
+          </div>
+          <div class="color-row">
+            <label>影</label>
+            <input type="checkbox" id="shadowEnabled" checked />
+            <input type="color" id="colorShadow" value="#000000" />
+            <input type="range" id="alphaShadow" min="0" max="100" value="90" />
+            <span class="alpha-value" id="alphaShadowVal">90%</span>
+          </div>
+          <div class="color-row">
+            <label>メンバー背景</label>
+            <input type="color" id="colorMembership" value="#1e7d32" />
+            <input type="range" id="alphaMembership" min="0" max="100" value="100" />
+            <span class="alpha-value" id="alphaMembershipVal">100%</span>
+          </div>
+          <button id="btnResetColors">デフォルトに戻す</button>
+        </div>
       </div>
 
-      <button id="btnResetColors">デフォルトに戻す</button>
+      <!-- ニコニコ風設定 -->
+      <div class="settings-col">
+        <div class="color-settings">
+          <h2>🎬 ニコニコ風設定</h2>
+
+          <div class="color-row">
+            <label>フォント</label>
+            <select id="nicoFontFamily">
+              <optgroup label="— Webフォント —">
+                <option value="Noto Sans JP">Noto Sans JP</option>
+                <option value="M PLUS Rounded 1c">M PLUS Rounded 1c</option>
+                <option value="M PLUS 1p">M PLUS 1p</option>
+                <option value="Kosugi Maru">小杉丸ゴシック</option>
+                <option value="Zen Maru Gothic">Zen Maru Gothic</option>
+                <option value="BIZ UDGothic">BIZ UDゴシック</option>
+                <option value="Klee One">Klee One</option>
+                <option value="Yusei Magic">Yusei Magic</option>
+                <option value="Hachi Maru Pop">はちまるポップ</option>
+              </optgroup>
+              <optgroup label="— システムフォント —">
+                <option value="Yu Gothic">游ゴシック</option>
+                <option value="Meiryo">メイリオ</option>
+                <option value="MS Gothic">MS ゴシック</option>
+                <option value="Arial">Arial</option>
+                <option value="Impact">Impact</option>
+              </optgroup>
+              <optgroup id="nicoInstalledFontsGroup" label="— インストール済み —">
+              </optgroup>
+            </select>
+          </div>
+          <div class="color-row">
+            <label>文字色</label>
+            <input type="color" id="nicoColorText" value="#ffffff" />
+            <input type="range" id="nicoAlphaText" min="0" max="100" value="100" />
+            <span class="alpha-value" id="nicoAlphaTextVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>サイズ (px)</label>
+            <input type="number" id="nicoFontSize" value="64" min="20" max="200" />
+          </div>
+          <div class="color-row">
+            <label>太字</label>
+            <input type="checkbox" id="nicoFontBold" checked />
+          </div>
+          <div class="color-row">
+            <label>流れる速度 (秒)</label>
+            <input type="number" id="nicoScrollDuration" value="8" min="3" max="20" step="0.5" />
+          </div>
+          <div class="color-row">
+            <label>縁取り</label>
+            <input type="checkbox" id="nicoShadowEnabled" checked />
+            <input type="color" id="nicoColorShadow" value="#000000" />
+            <input type="range" id="nicoAlphaShadow" min="0" max="100" value="100" />
+            <span class="alpha-value" id="nicoAlphaShadowVal">100%</span>
+          </div>
+          <button id="btnResetNico">デフォルトに戻す</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -407,6 +471,7 @@
     // ========== インストール済みフォント検出 ==========
     async function detectInstalledFonts() {
       const installedGroup = document.getElementById("installedFontsGroup");
+      const nicoInstalledGroup = document.getElementById("nicoInstalledFontsGroup");
       
       // Local Font Access API が使える場合
       if ("queryLocalFonts" in window) {
@@ -445,10 +510,15 @@
           otherFonts.sort();
           
           for (const family of [...jpFonts, ...otherFonts].slice(0, 50)) {
-            const option = document.createElement("option");
-            option.value = family;
-            option.textContent = family;
-            installedGroup.appendChild(option);
+            const option1 = document.createElement("option");
+            option1.value = family;
+            option1.textContent = family;
+            installedGroup.appendChild(option1);
+
+            const option2 = document.createElement("option");
+            option2.value = family;
+            option2.textContent = family;
+            nicoInstalledGroup.appendChild(option2);
           }
         } catch (e) {
           console.log("Font detection not available:", e);
@@ -458,7 +528,7 @@
     
     detectInstalledFonts();
 
-    // ========== カラー設定 ==========
+    // ========== オーバーレイ設定 ==========
     const COLOR_KEY = "yt-overlay-colors";
 
     const defaultColors = {
@@ -495,12 +565,48 @@
       alphaMembership: document.getElementById("alphaMembership")
     };
 
+    // ========== ニコニコ風設定 ==========
+    const NICO_KEY = "yt-overlay-nico";
+
+    const defaultNico = {
+      fontFamily: "Noto Sans JP",
+      colorText: "#ffffff",
+      alphaText: 100,
+      fontSize: 64,
+      fontBold: true,
+      scrollDuration: 8,
+      shadowEnabled: true,
+      colorShadow: "#000000",
+      alphaShadow: 100
+    };
+
+    const nicoInputs = {
+      fontFamily: document.getElementById("nicoFontFamily"),
+      colorText: document.getElementById("nicoColorText"),
+      alphaText: document.getElementById("nicoAlphaText"),
+      fontSize: document.getElementById("nicoFontSize"),
+      fontBold: document.getElementById("nicoFontBold"),
+      scrollDuration: document.getElementById("nicoScrollDuration"),
+      shadowEnabled: document.getElementById("nicoShadowEnabled"),
+      colorShadow: document.getElementById("nicoColorShadow"),
+      alphaShadow: document.getElementById("nicoAlphaShadow")
+    };
+
     function updateAlphaDisplay() {
+      // オーバーレイ用
       const alphaKeys = ["alphaNormal", "alphaText", "alphaAuthor", "alphaShadow", "alphaMembership"];
       for (const key of alphaKeys) {
         const valEl = document.getElementById(key + "Val");
         if (valEl && colorInputs[key]) {
           valEl.textContent = colorInputs[key].value + "%";
+        }
+      }
+      // ニコニコ用
+      const nicoAlphaKeys = ["alphaText", "alphaShadow"];
+      for (const key of nicoAlphaKeys) {
+        const valEl = document.getElementById("nico" + key.charAt(0).toUpperCase() + key.slice(1) + "Val");
+        if (valEl && nicoInputs[key]) {
+          valEl.textContent = nicoInputs[key].value + "%";
         }
       }
     }
@@ -515,7 +621,18 @@
           colorInputs[key].value = colors[key] ?? defaultColors[key];
         }
       }
-      updateAlphaDisplay();
+    }
+
+    function loadNicoSettings() {
+      const saved = localStorage.getItem(NICO_KEY);
+      const nico = saved ? JSON.parse(saved) : defaultNico;
+      for (const key in nicoInputs) {
+        if (nicoInputs[key].type === "checkbox") {
+          nicoInputs[key].checked = nico[key] ?? defaultNico[key];
+        } else {
+          nicoInputs[key].value = nico[key] ?? defaultNico[key];
+        }
+      }
     }
 
     function saveColorSettings() {
@@ -529,14 +646,39 @@
       }
       localStorage.setItem(COLOR_KEY, JSON.stringify(colors));
       updateAlphaDisplay();
-      // メインプロセス経由でサーバーに通知
-      ipcRenderer.send("colors:update", colors);
+      sendAllSettings();
     }
 
-    // 各カラー入力の変更を監視
+    function saveNicoSettings() {
+      const nico = {};
+      for (const key in nicoInputs) {
+        if (nicoInputs[key].type === "checkbox") {
+          nico[key] = nicoInputs[key].checked;
+        } else {
+          nico[key] = nicoInputs[key].value;
+        }
+      }
+      localStorage.setItem(NICO_KEY, JSON.stringify(nico));
+      updateAlphaDisplay();
+      sendAllSettings();
+    }
+
+    function sendAllSettings() {
+      const colorsSaved = localStorage.getItem(COLOR_KEY);
+      const nicoSaved = localStorage.getItem(NICO_KEY);
+      const colors = colorsSaved ? JSON.parse(colorsSaved) : defaultColors;
+      const nico = nicoSaved ? JSON.parse(nicoSaved) : defaultNico;
+      ipcRenderer.send("colors:update", { overlay: colors, nico: nico });
+    }
+
+    // 各入力の変更を監視
     for (const key in colorInputs) {
       colorInputs[key].addEventListener("input", saveColorSettings);
       colorInputs[key].addEventListener("change", saveColorSettings);
+    }
+    for (const key in nicoInputs) {
+      nicoInputs[key].addEventListener("input", saveNicoSettings);
+      nicoInputs[key].addEventListener("change", saveNicoSettings);
     }
 
     document.getElementById("btnResetColors").addEventListener("click", () => {
@@ -550,13 +692,24 @@
       saveColorSettings();
     });
 
+    document.getElementById("btnResetNico").addEventListener("click", () => {
+      for (const key in nicoInputs) {
+        if (nicoInputs[key].type === "checkbox") {
+          nicoInputs[key].checked = defaultNico[key];
+        } else {
+          nicoInputs[key].value = defaultNico[key];
+        }
+      }
+      saveNicoSettings();
+    });
+
     // 初期読み込み
     loadColorSettings();
+    loadNicoSettings();
+    updateAlphaDisplay();
     // 起動時に現在の設定をサーバーに送信
     setTimeout(() => {
-      const saved = localStorage.getItem(COLOR_KEY);
-      const colors = saved ? JSON.parse(saved) : defaultColors;
-      ipcRenderer.send("colors:update", colors);
+      sendAllSettings();
     }, 500);
   </script>
 </body>

@@ -13,20 +13,33 @@ const {
 
 let mainWindow = null;
 let currentColors = {
-  fontFamily: "Noto Sans JP",
-  colorNormal: "#000000",
-  alphaNormal: 100,
-  colorText: "#ffffff",
-  alphaText: 100,
-  colorAuthor: "#ffd8f8",
-  alphaAuthor: 100,
-  fontSize: 22,
-  fontBold: true,
-  shadowEnabled: true,
-  colorShadow: "#000000",
-  alphaShadow: 90,
-  colorMembership: "#1e7d32",
-  alphaMembership: 100
+  overlay: {
+    fontFamily: "Noto Sans JP",
+    colorNormal: "#000000",
+    alphaNormal: 100,
+    colorText: "#ffffff",
+    alphaText: 100,
+    colorAuthor: "#ffd8f8",
+    alphaAuthor: 100,
+    fontSize: 22,
+    fontBold: true,
+    shadowEnabled: true,
+    colorShadow: "#000000",
+    alphaShadow: 90,
+    colorMembership: "#1e7d32",
+    alphaMembership: 100
+  },
+  nico: {
+    fontFamily: "Noto Sans JP",
+    colorText: "#ffffff",
+    alphaText: 100,
+    fontSize: 64,
+    fontBold: true,
+    scrollDuration: 8,
+    shadowEnabled: true,
+    colorShadow: "#000000",
+    alphaShadow: 100
+  }
 };
 
 function isWindowAlive() {
@@ -55,9 +68,14 @@ function createOverlayServer() {
     res.json(getComments());
   });
 
-  // カラー設定を取得するエンドポイント
+  // オーバーレイ設定を取得するエンドポイント
   srv.get("/settings/colors", (req, res) => {
-    res.json(currentColors);
+    res.json(currentColors.overlay);
+  });
+
+  // ニコニコ風設定を取得するエンドポイント
+  srv.get("/settings/nico", (req, res) => {
+    res.json(currentColors.nico);
   });
 
   const server = http.createServer(srv);
@@ -117,11 +135,11 @@ function createObsLauncherFiles() {
  */
 function createMainWindow(launchersDir) {
   mainWindow = new BrowserWindow({
-    width: 750,
-    height: 480,
+    width: 920,
+    height: 520,
     resizable: true,
-    minWidth: 600,
-    minHeight: 400,
+    minWidth: 800,
+    minHeight: 450,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -183,9 +201,14 @@ ipcMain.on("launchers:open", () => {
 });
 
 // カラー設定の更新
-ipcMain.on("colors:update", (_event, colors) => {
-  currentColors = colors;
-  console.log("Colors updated:", currentColors);
+ipcMain.on("colors:update", (_event, settings) => {
+  if (settings.overlay) {
+    currentColors.overlay = settings.overlay;
+  }
+  if (settings.nico) {
+    currentColors.nico = settings.nico;
+  }
+  console.log("Settings updated:", currentColors);
 });
 
 // ==============================
