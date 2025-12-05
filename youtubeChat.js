@@ -530,6 +530,9 @@ async function startLiveChat(inputStr) {
   running = true;
   stopFlag = false;
 
+  // 過去のコメントをクリア
+  comments.length = 0;
+
   try {
     const videoId = await resolveVideoId(inputStr);
     if (!videoId) {

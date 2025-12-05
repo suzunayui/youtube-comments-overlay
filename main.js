@@ -12,6 +12,22 @@ const {
 } = require("./youtubeChat");
 
 let mainWindow = null;
+let currentColors = {
+  fontFamily: "Noto Sans JP",
+  colorNormal: "#000000",
+  alphaNormal: 100,
+  colorText: "#ffffff",
+  alphaText: 100,
+  colorAuthor: "#ffd8f8",
+  alphaAuthor: 100,
+  fontSize: 22,
+  fontBold: true,
+  shadowEnabled: true,
+  colorShadow: "#000000",
+  alphaShadow: 90,
+  colorMembership: "#1e7d32",
+  alphaMembership: 100
+};
 
 function isWindowAlive() {
   return mainWindow && !mainWindow.isDestroyed();
@@ -37,6 +53,11 @@ function createOverlayServer() {
 
   srv.get("/comments", (req, res) => {
     res.json(getComments());
+  });
+
+  // カラー設定を取得するエンドポイント
+  srv.get("/settings/colors", (req, res) => {
+    res.json(currentColors);
   });
 
   const server = http.createServer(srv);
@@ -96,9 +117,11 @@ function createObsLauncherFiles() {
  */
 function createMainWindow(launchersDir) {
   mainWindow = new BrowserWindow({
-    width: 480,
-    height: 380,
-    resizable: false,
+    width: 750,
+    height: 480,
+    resizable: true,
+    minWidth: 600,
+    minHeight: 400,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -159,6 +182,12 @@ ipcMain.on("launchers:open", () => {
   shell.openPath(dir);
 });
 
+// カラー設定の更新
+ipcMain.on("colors:update", (_event, colors) => {
+  currentColors = colors;
+  console.log("Colors updated:", currentColors);
+});
+
 // ==============================
 // アプリライフサイクル
 // ==============================
@@ -168,9 +197,6 @@ app.whenReady().then(() => {
 
   // 起動時にランチャーHTMLを生成
   const launchersDir = createObsLauncherFiles();
-
-  // フォルダを自動で開いて「ドラッグしてね！」状態にする
-  shell.openPath(launchersDir);
 
   // 設定画面を表示
   createMainWindow(launchersDir);

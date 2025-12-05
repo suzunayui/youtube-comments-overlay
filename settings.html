@@ -6,21 +6,41 @@
 <style>
   body {
     margin: 0;
-    padding: 16px;
+    padding: 12px;
     font-family: "Yu Gothic", "Meiryo", sans-serif;
     background: #1e1e2f;
     color: #f5f5f5;
+    overflow: hidden;
+  }
+
+  .container {
+    display: flex;
+    gap: 12px;
+    height: calc(100vh - 24px);
+  }
+
+  .left-panel {
+    flex: 1;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .right-panel {
+    flex: 1;
+    min-width: 280px;
+    overflow-y: auto;
   }
 
   h1 {
-    font-size: 20px;
-    margin-bottom: 8px;
+    font-size: 18px;
+    margin: 0 0 8px 0;
   }
 
   label {
     display: block;
-    margin-top: 12px;
-    font-size: 14px;
+    margin-top: 8px;
+    font-size: 13px;
   }
 
   input[type="text"] {
@@ -31,22 +51,23 @@
     border: 1px solid #555;
     background: #2a2a3d;
     color: #f5f5f5;
+    box-sizing: border-box;
   }
 
   .buttons {
-    margin-top: 16px;
+    margin-top: 10px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
   }
 
   button {
     flex: 1;
-    padding: 8px 0;
+    padding: 6px 0;
     border-radius: 6px;
     border: none;
     cursor: pointer;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   #btnStart {
@@ -60,72 +81,266 @@
   }
 
   #status {
-    margin-top: 12px;
-    font-size: 13px;
+    margin-top: 8px;
+    font-size: 12px;
   }
 
   .small {
-    font-size: 11px;
+    font-size: 10px;
     color: #ccccff;
-    margin-top: 8px;
+    margin-top: 6px;
   }
 
   #launchersBox {
-    margin-top: 12px;
-    padding: 8px;
+    margin-top: 10px;
+    padding: 6px;
     border-radius: 6px;
     background: #25253a;
-    font-size: 11px;
+    font-size: 10px;
   }
 
   #launchersBox code {
     background: #333;
-    padding: 2px 4px;
+    padding: 1px 3px;
     border-radius: 3px;
   }
 
   #btnOpenLaunchers {
-    margin-top: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
+    margin-top: 4px;
+    padding: 3px 6px;
+    font-size: 10px;
     border-radius: 4px;
     border: none;
     cursor: pointer;
     background: #3f51b5;
     color: #fff;
   }
+
+  .color-settings {
+    padding: 10px;
+    background: #25253a;
+    border-radius: 8px;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  .color-settings h2 {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+    border-bottom: 1px solid #444;
+    padding-bottom: 6px;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  .color-row label {
+    flex: 1;
+    margin: 0;
+    font-size: 12px;
+    min-width: 90px;
+  }
+
+  .color-row input[type="color"] {
+    width: 32px;
+    height: 24px;
+    padding: 0;
+    border: 2px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+  }
+
+  .color-row input[type="number"] {
+    width: 50px;
+    padding: 3px 5px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3d;
+    color: #f5f5f5;
+    font-size: 11px;
+  }
+
+  .color-row input[type="range"] {
+    width: 60px;
+    cursor: pointer;
+  }
+
+  .color-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .color-row select {
+    flex: 1;
+    max-width: 150px;
+    padding: 3px 5px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3d;
+    color: #f5f5f5;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .alpha-value {
+    font-size: 10px;
+    color: #aaa;
+    width: 30px;
+    text-align: right;
+  }
+
+  #btnResetColors {
+    margin-top: 8px;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: #666;
+    color: #fff;
+  }
+
+  #btnResetColors:hover {
+    background: #888;
+  }
+
+  .color-category {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #aaa;
+    border-top: 1px solid #333;
+    padding-top: 6px;
+  }
+
+  .color-category:first-of-type {
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+  }
 </style>
 </head>
 <body>
-  <h1>YouTube Chat Overlay</h1>
+<div class="container">
+  <div class="left-panel">
+    <h1>YouTube Chat Overlay</h1>
 
-  <label>
-    チャンネルID / @ハンドル / 動画ID
-    <input type="text" id="inputTarget" placeholder="@すずなゆい / UCxxxx / abcdefghijk" />
-  </label>
+    <label>
+      チャンネルID / @ハンドル / 動画ID
+      <input type="text" id="inputTarget" placeholder="@すずなゆい / UCxxxx / abcdefghijk" />
+    </label>
 
-  <div class="buttons">
-    <button id="btnStart">チャット取得開始</button>
-    <button id="btnStop">停止</button>
-  </div>
+    <div class="buttons">
+      <button id="btnStart">チャット取得開始</button>
+      <button id="btnStop">停止</button>
+    </div>
 
-  <div id="status">ステータス: 停止中</div>
+    <div id="status">ステータス: 停止中</div>
 
-  <div id="launchersBox">
-    <div id="launchersPath">OBS 用ランチャー: 準備中…</div>
-    <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
+    <div id="launchersBox">
+      <div id="launchersPath">OBS 用ランチャー: 準備中…</div>
+      <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
+      <div class="small">
+        フォルダ内の <code>*.html</code> を OBS にドラッグ＆ドロップ
+      </div>
+    </div>
+
     <div class="small">
-      フォルダ内の <code>*.html</code> を OBS のソースリストにドラッグ＆ドロップすると、<br>
-      そのままブラウザソースとして読み込まれます。
+      直接 URL で使う場合：<br />
+      ・通常: <code>http://127.0.0.1:5000/</code><br />
+      ・ニコニコ風: <code>http://127.0.0.1:5000/niconico</code><br />
+      ・スパチャ専用: <code>http://127.0.0.1:5000/supers</code>
     </div>
   </div>
 
-  <div class="small">
-    直接 URL で使う場合：<br />
-    ・通常コメント: <code>http://127.0.0.1:5000/</code><br />
-    ・ニコニコ風: <code>http://127.0.0.1:5000/niconico</code><br />
-    ・スパチャ専用: <code>http://127.0.0.1:5000/supers</code>
+  <div class="right-panel">
+    <div class="color-settings">
+      <h2>🎨 オーバーレイ色設定</h2>
+
+      <div class="color-category">基本スタイル</div>
+      <div class="color-row">
+        <label>フォント</label>
+        <select id="fontFamily">
+          <optgroup label="— Webフォント (Google Fonts) —">
+            <option value="Noto Sans JP">Noto Sans JP</option>
+            <option value="M PLUS Rounded 1c">M PLUS Rounded 1c</option>
+            <option value="M PLUS 1p">M PLUS 1p</option>
+            <option value="Kosugi Maru">小杉丸ゴシック</option>
+            <option value="Zen Maru Gothic">Zen Maru Gothic</option>
+            <option value="BIZ UDGothic">BIZ UDゴシック</option>
+            <option value="Klee One">Klee One</option>
+            <option value="Yusei Magic">Yusei Magic</option>
+            <option value="Hachi Maru Pop">はちまるポップ</option>
+          </optgroup>
+          <optgroup label="— システムフォント —">
+            <option value="Yu Gothic">游ゴシック</option>
+            <option value="Meiryo">メイリオ</option>
+            <option value="MS Gothic">MS ゴシック</option>
+            <option value="Hiragino Sans">ヒラギノ角ゴ</option>
+            <option value="Arial">Arial</option>
+            <option value="Comic Sans MS">Comic Sans MS</option>
+            <option value="Impact">Impact</option>
+          </optgroup>
+          <optgroup id="installedFontsGroup" label="— インストール済みフォント —">
+          </optgroup>
+        </select>
+      </div>
+      <div class="color-row">
+        <label>通常コメント背景</label>
+        <input type="color" id="colorNormal" value="#000000" />
+        <input type="range" id="alphaNormal" min="0" max="100" value="100" />
+        <span class="alpha-value" id="alphaNormalVal">100%</span>
+      </div>
+      <div class="color-row">
+        <label>文字色</label>
+        <input type="color" id="colorText" value="#ffffff" />
+        <input type="range" id="alphaText" min="0" max="100" value="100" />
+        <span class="alpha-value" id="alphaTextVal">100%</span>
+      </div>
+      <div class="color-row">
+        <label>投稿者名の色</label>
+        <input type="color" id="colorAuthor" value="#ffd8f8" />
+        <input type="range" id="alphaAuthor" min="0" max="100" value="100" />
+        <span class="alpha-value" id="alphaAuthorVal">100%</span>
+      </div>
+      <div class="color-row">
+        <label>フォントサイズ (px)</label>
+        <input type="number" id="fontSize" value="22" min="10" max="48" />
+      </div>
+      <div class="color-row">
+        <label>太字 (ボールド)</label>
+        <input type="checkbox" id="fontBold" checked />
+        <span style="font-size:11px; margin-left:4px;">有効</span>
+      </div>
+      <div class="color-row">
+        <label>文字の影</label>
+        <input type="checkbox" id="shadowEnabled" checked />
+        <span style="font-size:11px; margin-left:4px;">有効</span>
+      </div>
+      <div class="color-row">
+        <label>影の色</label>
+        <input type="color" id="colorShadow" value="#000000" />
+        <input type="range" id="alphaShadow" min="0" max="100" value="90" />
+        <span class="alpha-value" id="alphaShadowVal">90%</span>
+      </div>
+
+      <div class="color-category">メンバーシップ / ギフト</div>
+      <div class="color-row">
+        <label>メンバーシップ系背景</label>
+        <input type="color" id="colorMembership" value="#1e7d32" />
+        <input type="range" id="alphaMembership" min="0" max="100" value="100" />
+        <span class="alpha-value" id="alphaMembershipVal">100%</span>
+      </div>
+
+      <button id="btnResetColors">デフォルトに戻す</button>
+    </div>
   </div>
+</div>
 
   <script>
     const { ipcRenderer } = require("electron");
@@ -188,6 +403,161 @@
     btnOpenLaunchers.addEventListener("click", () => {
       ipcRenderer.send("launchers:open");
     });
+
+    // ========== インストール済みフォント検出 ==========
+    async function detectInstalledFonts() {
+      const installedGroup = document.getElementById("installedFontsGroup");
+      
+      // Local Font Access API が使える場合
+      if ("queryLocalFonts" in window) {
+        try {
+          const fonts = await window.queryLocalFonts();
+          const fontFamilies = new Set();
+          for (const font of fonts) {
+            fontFamilies.add(font.family);
+          }
+          
+          // 日本語フォントを優先的に表示
+          const jpFonts = [];
+          const otherFonts = [];
+          
+          for (const family of fontFamilies) {
+            // 既にリストにあるものは除外
+            const existingOptions = document.querySelectorAll("#fontFamily option");
+            let exists = false;
+            for (const opt of existingOptions) {
+              if (opt.value === family) {
+                exists = true;
+                break;
+              }
+            }
+            if (exists) continue;
+            
+            // 日本語フォントっぽいものを判定
+            if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]|Gothic|Mincho|Meiryo|Yu|Hiragino|Noto.*JP|Source Han|ゴシック|明朝/.test(family)) {
+              jpFonts.push(family);
+            } else {
+              otherFonts.push(family);
+            }
+          }
+          
+          jpFonts.sort();
+          otherFonts.sort();
+          
+          for (const family of [...jpFonts, ...otherFonts].slice(0, 50)) {
+            const option = document.createElement("option");
+            option.value = family;
+            option.textContent = family;
+            installedGroup.appendChild(option);
+          }
+        } catch (e) {
+          console.log("Font detection not available:", e);
+        }
+      }
+    }
+    
+    detectInstalledFonts();
+
+    // ========== カラー設定 ==========
+    const COLOR_KEY = "yt-overlay-colors";
+
+    const defaultColors = {
+      fontFamily: "Noto Sans JP",
+      colorNormal: "#000000",
+      alphaNormal: 100,
+      colorText: "#ffffff",
+      alphaText: 100,
+      colorAuthor: "#ffd8f8",
+      alphaAuthor: 100,
+      fontSize: 22,
+      fontBold: true,
+      shadowEnabled: true,
+      colorShadow: "#000000",
+      alphaShadow: 90,
+      colorMembership: "#1e7d32",
+      alphaMembership: 100
+    };
+
+    const colorInputs = {
+      fontFamily: document.getElementById("fontFamily"),
+      colorNormal: document.getElementById("colorNormal"),
+      alphaNormal: document.getElementById("alphaNormal"),
+      colorText: document.getElementById("colorText"),
+      alphaText: document.getElementById("alphaText"),
+      colorAuthor: document.getElementById("colorAuthor"),
+      alphaAuthor: document.getElementById("alphaAuthor"),
+      fontSize: document.getElementById("fontSize"),
+      fontBold: document.getElementById("fontBold"),
+      shadowEnabled: document.getElementById("shadowEnabled"),
+      colorShadow: document.getElementById("colorShadow"),
+      alphaShadow: document.getElementById("alphaShadow"),
+      colorMembership: document.getElementById("colorMembership"),
+      alphaMembership: document.getElementById("alphaMembership")
+    };
+
+    function updateAlphaDisplay() {
+      const alphaKeys = ["alphaNormal", "alphaText", "alphaAuthor", "alphaShadow", "alphaMembership"];
+      for (const key of alphaKeys) {
+        const valEl = document.getElementById(key + "Val");
+        if (valEl && colorInputs[key]) {
+          valEl.textContent = colorInputs[key].value + "%";
+        }
+      }
+    }
+
+    function loadColorSettings() {
+      const saved = localStorage.getItem(COLOR_KEY);
+      const colors = saved ? JSON.parse(saved) : defaultColors;
+      for (const key in colorInputs) {
+        if (colorInputs[key].type === "checkbox") {
+          colorInputs[key].checked = colors[key] ?? defaultColors[key];
+        } else {
+          colorInputs[key].value = colors[key] ?? defaultColors[key];
+        }
+      }
+      updateAlphaDisplay();
+    }
+
+    function saveColorSettings() {
+      const colors = {};
+      for (const key in colorInputs) {
+        if (colorInputs[key].type === "checkbox") {
+          colors[key] = colorInputs[key].checked;
+        } else {
+          colors[key] = colorInputs[key].value;
+        }
+      }
+      localStorage.setItem(COLOR_KEY, JSON.stringify(colors));
+      updateAlphaDisplay();
+      // メインプロセス経由でサーバーに通知
+      ipcRenderer.send("colors:update", colors);
+    }
+
+    // 各カラー入力の変更を監視
+    for (const key in colorInputs) {
+      colorInputs[key].addEventListener("input", saveColorSettings);
+      colorInputs[key].addEventListener("change", saveColorSettings);
+    }
+
+    document.getElementById("btnResetColors").addEventListener("click", () => {
+      for (const key in colorInputs) {
+        if (colorInputs[key].type === "checkbox") {
+          colorInputs[key].checked = defaultColors[key];
+        } else {
+          colorInputs[key].value = defaultColors[key];
+        }
+      }
+      saveColorSettings();
+    });
+
+    // 初期読み込み
+    loadColorSettings();
+    // 起動時に現在の設定をサーバーに送信
+    setTimeout(() => {
+      const saved = localStorage.getItem(COLOR_KEY);
+      const colors = saved ? JSON.parse(saved) : defaultColors;
+      ipcRenderer.send("colors:update", colors);
+    }, 500);
   </script>
 </body>
 </html>
