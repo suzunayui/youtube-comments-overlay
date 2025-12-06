@@ -255,7 +255,7 @@
     <div id="status">ステータス: 停止中</div>
 
     <div id="launchersBox">
-      <div id="launchersPath">OBS 用ランチャー: 準備中…</div>
+      <div id="launchersPath">OBS 用ランチャーフォルダ: 準備中…</div>
       <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
       <div class="small">
         フォルダ内の <code>*.html</code> を OBS にドラッグ＆ドロップ
@@ -322,6 +322,10 @@
           <div class="color-row">
             <label>サイズ (px)</label>
             <input type="number" id="fontSize" value="22" min="10" max="48" />
+          </div>
+          <div class="color-row">
+            <label>アイコンサイズ (px)</label>
+            <input type="number" id="avatarSize" value="40" min="16" max="120" />
           </div>
           <div class="color-row">
             <label>太字</label>
@@ -406,311 +410,313 @@
   </div>
 </div>
 
-  <script>
-    const { ipcRenderer } = require("electron");
+<script>
+  const { ipcRenderer } = require("electron");
 
-    const inputTarget = document.getElementById("inputTarget");
-    const btnStart = document.getElementById("btnStart");
-    const btnStop = document.getElementById("btnStop");
-    const statusEl = document.getElementById("status");
+  const inputTarget = document.getElementById("inputTarget");
+  const btnStart = document.getElementById("btnStart");
+  const btnStop = document.getElementById("btnStop");
+  const statusEl = document.getElementById("status");
 
-    const launchersPathEl = document.getElementById("launchersPath");
-    const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
+  const launchersPathEl = document.getElementById("launchersPath");
+  const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
 
-    const KEY = "yt-overlay-input";
+  const KEY = "yt-overlay-input";
 
-    window.addEventListener("DOMContentLoaded", () => {
-      const saved = localStorage.getItem(KEY);
-      if (saved) {
-        inputTarget.value = saved;
-      }
-    });
+  window.addEventListener("DOMContentLoaded", () => {
+    const saved = localStorage.getItem(KEY);
+    if (saved) {
+      inputTarget.value = saved;
+    }
+  });
 
-    btnStart.addEventListener("click", () => {
-      const v = inputTarget.value.trim();
-      if (!v) {
-        statusEl.textContent = "ステータス: 入力が空です";
-        return;
-      }
+  btnStart.addEventListener("click", () => {
+    const v = inputTarget.value.trim();
+    if (!v) {
+      statusEl.textContent = "ステータス: 入力が空です";
+      return;
+    }
 
-      localStorage.setItem(KEY, v);
+    localStorage.setItem(KEY, v);
 
+    statusEl.textContent = "ステータス: 起動中…";
+    ipcRenderer.send("chat:start", v);
+  });
+
+  btnStop.addEventListener("click", () => {
+    ipcRenderer.send("chat:stop");
+    statusEl.textContent = "ステータス: 停止要求を送信しました…";
+  });
+
+  // メインプロセスからのステータス通知
+  ipcRenderer.on("chat:status", (_event, state) => {
+    if (state === "starting") {
       statusEl.textContent = "ステータス: 起動中…";
-      ipcRenderer.send("chat:start", v);
-    });
-
-    btnStop.addEventListener("click", () => {
-      ipcRenderer.send("chat:stop");
-      statusEl.textContent = "ステータス: 停止要求を送信しました…";
-    });
-
-    // メインプロセスからのステータス通知
-    ipcRenderer.on("chat:status", (_event, state) => {
-      if (state === "starting") {
-        statusEl.textContent = "ステータス: 起動中…";
-      } else if (state === "stopped") {
-        statusEl.textContent = "ステータス: 停止中";
-      } else {
-        statusEl.textContent = "ステータス: " + state;
-      }
-    });
-
-    ipcRenderer.on("chat:error", (_event, message) => {
-      statusEl.textContent = "ステータス: エラー: " + message;
-    });
-
-    // ランチャーフォルダのパス表示
-    ipcRenderer.on("launchers:path", (_event, dirPath) => {
-      launchersPathEl.textContent = "OBS 用ランチャーフォルダ: " + dirPath;
-    });
-
-    btnOpenLaunchers.addEventListener("click", () => {
-      ipcRenderer.send("launchers:open");
-    });
-
-    // ========== インストール済みフォント検出 ==========
-    async function detectInstalledFonts() {
-      const installedGroup = document.getElementById("installedFontsGroup");
-      const nicoInstalledGroup = document.getElementById("nicoInstalledFontsGroup");
-      
-      // Local Font Access API が使える場合
-      if ("queryLocalFonts" in window) {
-        try {
-          const fonts = await window.queryLocalFonts();
-          const fontFamilies = new Set();
-          for (const font of fonts) {
-            fontFamilies.add(font.family);
-          }
-          
-          // 日本語フォントを優先的に表示
-          const jpFonts = [];
-          const otherFonts = [];
-          
-          for (const family of fontFamilies) {
-            // 既にリストにあるものは除外
-            const existingOptions = document.querySelectorAll("#fontFamily option");
-            let exists = false;
-            for (const opt of existingOptions) {
-              if (opt.value === family) {
-                exists = true;
-                break;
-              }
-            }
-            if (exists) continue;
-            
-            // 日本語フォントっぽいものを判定
-            if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]|Gothic|Mincho|Meiryo|Yu|Hiragino|Noto.*JP|Source Han|ゴシック|明朝/.test(family)) {
-              jpFonts.push(family);
-            } else {
-              otherFonts.push(family);
-            }
-          }
-          
-          jpFonts.sort();
-          otherFonts.sort();
-          
-          for (const family of [...jpFonts, ...otherFonts].slice(0, 50)) {
-            const option1 = document.createElement("option");
-            option1.value = family;
-            option1.textContent = family;
-            installedGroup.appendChild(option1);
-
-            const option2 = document.createElement("option");
-            option2.value = family;
-            option2.textContent = family;
-            nicoInstalledGroup.appendChild(option2);
-          }
-        } catch (e) {
-          console.log("Font detection not available:", e);
-        }
-      }
+    } else if (state === "stopped") {
+      statusEl.textContent = "ステータス: 停止中";
+    } else {
+      statusEl.textContent = "ステータス: " + state;
     }
+  });
+
+  ipcRenderer.on("chat:error", (_event, message) => {
+    statusEl.textContent = "ステータス: エラー: " + message;
+  });
+
+  // ランチャーフォルダのパス表示
+  ipcRenderer.on("launchers:path", (_event, dirPath) => {
+    launchersPathEl.textContent = "OBS 用ランチャーフォルダ: " + dirPath;
+  });
+
+  btnOpenLaunchers.addEventListener("click", () => {
+    ipcRenderer.send("launchers:open");
+  });
+
+  // ========== インストール済みフォント検出 ==========
+  async function detectInstalledFonts() {
+    const installedGroup = document.getElementById("installedFontsGroup");
+    const nicoInstalledGroup = document.getElementById("nicoInstalledFontsGroup");
     
-    detectInstalledFonts();
-
-    // ========== オーバーレイ設定 ==========
-    const COLOR_KEY = "yt-overlay-colors";
-
-    const defaultColors = {
-      fontFamily: "Noto Sans JP",
-      colorNormal: "#000000",
-      alphaNormal: 100,
-      colorText: "#ffffff",
-      alphaText: 100,
-      colorAuthor: "#ffd8f8",
-      alphaAuthor: 100,
-      fontSize: 22,
-      fontBold: true,
-      shadowEnabled: true,
-      colorShadow: "#000000",
-      alphaShadow: 90,
-      colorMembership: "#1e7d32",
-      alphaMembership: 100
-    };
-
-    const colorInputs = {
-      fontFamily: document.getElementById("fontFamily"),
-      colorNormal: document.getElementById("colorNormal"),
-      alphaNormal: document.getElementById("alphaNormal"),
-      colorText: document.getElementById("colorText"),
-      alphaText: document.getElementById("alphaText"),
-      colorAuthor: document.getElementById("colorAuthor"),
-      alphaAuthor: document.getElementById("alphaAuthor"),
-      fontSize: document.getElementById("fontSize"),
-      fontBold: document.getElementById("fontBold"),
-      shadowEnabled: document.getElementById("shadowEnabled"),
-      colorShadow: document.getElementById("colorShadow"),
-      alphaShadow: document.getElementById("alphaShadow"),
-      colorMembership: document.getElementById("colorMembership"),
-      alphaMembership: document.getElementById("alphaMembership")
-    };
-
-    // ========== ニコニコ風設定 ==========
-    const NICO_KEY = "yt-overlay-nico";
-
-    const defaultNico = {
-      fontFamily: "Noto Sans JP",
-      colorText: "#ffffff",
-      alphaText: 100,
-      fontSize: 64,
-      fontBold: true,
-      scrollDuration: 8,
-      shadowEnabled: true,
-      colorShadow: "#000000",
-      alphaShadow: 100
-    };
-
-    const nicoInputs = {
-      fontFamily: document.getElementById("nicoFontFamily"),
-      colorText: document.getElementById("nicoColorText"),
-      alphaText: document.getElementById("nicoAlphaText"),
-      fontSize: document.getElementById("nicoFontSize"),
-      fontBold: document.getElementById("nicoFontBold"),
-      scrollDuration: document.getElementById("nicoScrollDuration"),
-      shadowEnabled: document.getElementById("nicoShadowEnabled"),
-      colorShadow: document.getElementById("nicoColorShadow"),
-      alphaShadow: document.getElementById("nicoAlphaShadow")
-    };
-
-    function updateAlphaDisplay() {
-      // オーバーレイ用
-      const alphaKeys = ["alphaNormal", "alphaText", "alphaAuthor", "alphaShadow", "alphaMembership"];
-      for (const key of alphaKeys) {
-        const valEl = document.getElementById(key + "Val");
-        if (valEl && colorInputs[key]) {
-          valEl.textContent = colorInputs[key].value + "%";
+    // Local Font Access API が使える場合
+    if ("queryLocalFonts" in window) {
+      try {
+        const fonts = await window.queryLocalFonts();
+        const fontFamilies = new Set();
+        for (const font of fonts) {
+          fontFamilies.add(font.family);
         }
-      }
-      // ニコニコ用
-      const nicoAlphaKeys = ["alphaText", "alphaShadow"];
-      for (const key of nicoAlphaKeys) {
-        const valEl = document.getElementById("nico" + key.charAt(0).toUpperCase() + key.slice(1) + "Val");
-        if (valEl && nicoInputs[key]) {
-          valEl.textContent = nicoInputs[key].value + "%";
+        
+        // 日本語フォントを優先的に表示
+        const jpFonts = [];
+        const otherFonts = [];
+        
+        for (const family of fontFamilies) {
+          // 既にリストにあるものは除外
+          const existingOptions = document.querySelectorAll("#fontFamily option");
+          let exists = false;
+          for (const opt of existingOptions) {
+            if (opt.value === family) {
+              exists = true;
+              break;
+            }
+          }
+          if (exists) continue;
+          
+          // 日本語フォントっぽいものを判定
+          if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]|Gothic|Mincho|Meiryo|Yu|Hiragino|Noto.*JP|Source Han|ゴシック|明朝/.test(family)) {
+            jpFonts.push(family);
+          } else {
+            otherFonts.push(family);
+          }
         }
+        
+        jpFonts.sort();
+        otherFonts.sort();
+        
+        for (const family of [...jpFonts, ...otherFonts].slice(0, 50)) {
+          const option1 = document.createElement("option");
+          option1.value = family;
+          option1.textContent = family;
+          installedGroup.appendChild(option1);
+
+          const option2 = document.createElement("option");
+          option2.value = family;
+          option2.textContent = family;
+          nicoInstalledGroup.appendChild(option2);
+        }
+      } catch (e) {
+        console.log("Font detection not available:", e);
       }
     }
+  }
+  
+  detectInstalledFonts();
 
-    function loadColorSettings() {
-      const saved = localStorage.getItem(COLOR_KEY);
-      const colors = saved ? JSON.parse(saved) : defaultColors;
-      for (const key in colorInputs) {
-        if (colorInputs[key].type === "checkbox") {
-          colorInputs[key].checked = colors[key] ?? defaultColors[key];
-        } else {
-          colorInputs[key].value = colors[key] ?? defaultColors[key];
-        }
+  // ========== オーバーレイ設定 ==========
+  const COLOR_KEY = "yt-overlay-colors";
+
+  const defaultColors = {
+    fontFamily: "Noto Sans JP",
+    colorNormal: "#000000",
+    alphaNormal: 100,
+    colorText: "#ffffff",
+    alphaText: 100,
+    colorAuthor: "#ffd8f8",
+    alphaAuthor: 100,
+    fontSize: 22,
+    avatarSize: 40,
+    fontBold: true,
+    shadowEnabled: true,
+    colorShadow: "#000000",
+    alphaShadow: 90,
+    colorMembership: "#1e7d32",
+    alphaMembership: 100
+  };
+
+  const colorInputs = {
+    fontFamily: document.getElementById("fontFamily"),
+    colorNormal: document.getElementById("colorNormal"),
+    alphaNormal: document.getElementById("alphaNormal"),
+    colorText: document.getElementById("colorText"),
+    alphaText: document.getElementById("alphaText"),
+    colorAuthor: document.getElementById("colorAuthor"),
+    alphaAuthor: document.getElementById("alphaAuthor"),
+    fontSize: document.getElementById("fontSize"),
+    avatarSize: document.getElementById("avatarSize"),
+    fontBold: document.getElementById("fontBold"),
+    shadowEnabled: document.getElementById("shadowEnabled"),
+    colorShadow: document.getElementById("colorShadow"),
+    alphaShadow: document.getElementById("alphaShadow"),
+    colorMembership: document.getElementById("colorMembership"),
+    alphaMembership: document.getElementById("alphaMembership")
+  };
+
+  // ========== ニコニコ風設定 ==========
+  const NICO_KEY = "yt-overlay-nico";
+
+  const defaultNico = {
+    fontFamily: "Noto Sans JP",
+    colorText: "#ffffff",
+    alphaText: 100,
+    fontSize: 64,
+    fontBold: true,
+    scrollDuration: 8,
+    shadowEnabled: true,
+    colorShadow: "#000000",
+    alphaShadow: 100
+  };
+
+  const nicoInputs = {
+    fontFamily: document.getElementById("nicoFontFamily"),
+    colorText: document.getElementById("nicoColorText"),
+    alphaText: document.getElementById("nicoAlphaText"),
+    fontSize: document.getElementById("nicoFontSize"),
+    fontBold: document.getElementById("nicoFontBold"),
+    scrollDuration: document.getElementById("nicoScrollDuration"),
+    shadowEnabled: document.getElementById("nicoShadowEnabled"),
+    colorShadow: document.getElementById("nicoColorShadow"),
+    alphaShadow: document.getElementById("nicoAlphaShadow")
+  };
+
+  function updateAlphaDisplay() {
+    // オーバーレイ用
+    const alphaKeys = ["alphaNormal", "alphaText", "alphaAuthor", "alphaShadow", "alphaMembership"];
+    for (const key of alphaKeys) {
+      const valEl = document.getElementById(key + "Val");
+      if (valEl && colorInputs[key]) {
+        valEl.textContent = colorInputs[key].value + "%";
       }
     }
-
-    function loadNicoSettings() {
-      const saved = localStorage.getItem(NICO_KEY);
-      const nico = saved ? JSON.parse(saved) : defaultNico;
-      for (const key in nicoInputs) {
-        if (nicoInputs[key].type === "checkbox") {
-          nicoInputs[key].checked = nico[key] ?? defaultNico[key];
-        } else {
-          nicoInputs[key].value = nico[key] ?? defaultNico[key];
-        }
+    // ニコニコ用
+    const nicoAlphaKeys = ["alphaText", "alphaShadow"];
+    for (const key of nicoAlphaKeys) {
+      const valEl = document.getElementById("nico" + key.charAt(0).toUpperCase() + key.slice(1) + "Val");
+      if (valEl && nicoInputs[key]) {
+        valEl.textContent = nicoInputs[key].value + "%";
       }
     }
+  }
 
-    function saveColorSettings() {
-      const colors = {};
-      for (const key in colorInputs) {
-        if (colorInputs[key].type === "checkbox") {
-          colors[key] = colorInputs[key].checked;
-        } else {
-          colors[key] = colorInputs[key].value;
-        }
-      }
-      localStorage.setItem(COLOR_KEY, JSON.stringify(colors));
-      updateAlphaDisplay();
-      sendAllSettings();
-    }
-
-    function saveNicoSettings() {
-      const nico = {};
-      for (const key in nicoInputs) {
-        if (nicoInputs[key].type === "checkbox") {
-          nico[key] = nicoInputs[key].checked;
-        } else {
-          nico[key] = nicoInputs[key].value;
-        }
-      }
-      localStorage.setItem(NICO_KEY, JSON.stringify(nico));
-      updateAlphaDisplay();
-      sendAllSettings();
-    }
-
-    function sendAllSettings() {
-      const colorsSaved = localStorage.getItem(COLOR_KEY);
-      const nicoSaved = localStorage.getItem(NICO_KEY);
-      const colors = colorsSaved ? JSON.parse(colorsSaved) : defaultColors;
-      const nico = nicoSaved ? JSON.parse(nicoSaved) : defaultNico;
-      ipcRenderer.send("colors:update", { overlay: colors, nico: nico });
-    }
-
-    // 各入力の変更を監視
+  function loadColorSettings() {
+    const saved = localStorage.getItem(COLOR_KEY);
+    const colors = saved ? JSON.parse(saved) : defaultColors;
     for (const key in colorInputs) {
-      colorInputs[key].addEventListener("input", saveColorSettings);
-      colorInputs[key].addEventListener("change", saveColorSettings);
+      if (colorInputs[key].type === "checkbox") {
+        colorInputs[key].checked = colors[key] ?? defaultColors[key];
+      } else {
+        colorInputs[key].value = colors[key] ?? defaultColors[key];
+      }
     }
+  }
+
+  function loadNicoSettings() {
+    const saved = localStorage.getItem(NICO_KEY);
+    const nico = saved ? JSON.parse(saved) : defaultNico;
     for (const key in nicoInputs) {
-      nicoInputs[key].addEventListener("input", saveNicoSettings);
-      nicoInputs[key].addEventListener("change", saveNicoSettings);
+      if (nicoInputs[key].type === "checkbox") {
+        nicoInputs[key].checked = nico[key] ?? defaultNico[key];
+      } else {
+        nicoInputs[key].value = nico[key] ?? defaultNico[key];
+      }
     }
+  }
 
-    document.getElementById("btnResetColors").addEventListener("click", () => {
-      for (const key in colorInputs) {
-        if (colorInputs[key].type === "checkbox") {
-          colorInputs[key].checked = defaultColors[key];
-        } else {
-          colorInputs[key].value = defaultColors[key];
-        }
+  function saveColorSettings() {
+    const colors = {};
+    for (const key in colorInputs) {
+      if (colorInputs[key].type === "checkbox") {
+        colors[key] = colorInputs[key].checked;
+      } else {
+        colors[key] = colorInputs[key].value;
       }
-      saveColorSettings();
-    });
-
-    document.getElementById("btnResetNico").addEventListener("click", () => {
-      for (const key in nicoInputs) {
-        if (nicoInputs[key].type === "checkbox") {
-          nicoInputs[key].checked = defaultNico[key];
-        } else {
-          nicoInputs[key].value = defaultNico[key];
-        }
-      }
-      saveNicoSettings();
-    });
-
-    // 初期読み込み
-    loadColorSettings();
-    loadNicoSettings();
+    }
+    localStorage.setItem(COLOR_KEY, JSON.stringify(colors));
     updateAlphaDisplay();
-    // 起動時に現在の設定をサーバーに送信
-    setTimeout(() => {
-      sendAllSettings();
-    }, 500);
-  </script>
+    sendAllSettings();
+  }
+
+  function saveNicoSettings() {
+    const nico = {};
+    for (const key in nicoInputs) {
+      if (nicoInputs[key].type === "checkbox") {
+        nico[key] = nicoInputs[key].checked;
+      } else {
+        nico[key] = nicoInputs[key].value;
+      }
+    }
+    localStorage.setItem(NICO_KEY, JSON.stringify(nico));
+    updateAlphaDisplay();
+    sendAllSettings();
+  }
+
+  function sendAllSettings() {
+    const colorsSaved = localStorage.getItem(COLOR_KEY);
+    const nicoSaved = localStorage.getItem(NICO_KEY);
+    const colors = colorsSaved ? JSON.parse(colorsSaved) : defaultColors;
+    const nico = nicoSaved ? JSON.parse(nicoSaved) : defaultNico;
+    ipcRenderer.send("colors:update", { overlay: colors, nico: nico });
+  }
+
+  // 各入力の変更を監視
+  for (const key in colorInputs) {
+    colorInputs[key].addEventListener("input", saveColorSettings);
+    colorInputs[key].addEventListener("change", saveColorSettings);
+  }
+  for (const key in nicoInputs) {
+    nicoInputs[key].addEventListener("input", saveNicoSettings);
+    nicoInputs[key].addEventListener("change", saveNicoSettings);
+  }
+
+  document.getElementById("btnResetColors").addEventListener("click", () => {
+    for (const key in colorInputs) {
+      if (colorInputs[key].type === "checkbox") {
+        colorInputs[key].checked = defaultColors[key];
+      } else {
+        colorInputs[key].value = defaultColors[key];
+      }
+    }
+    saveColorSettings();
+  });
+
+  document.getElementById("btnResetNico").addEventListener("click", () => {
+    for (const key in nicoInputs) {
+      if (nicoInputs[key].type === "checkbox") {
+        nicoInputs[key].checked = defaultNico[key];
+      } else {
+        nicoInputs[key].value = defaultNico[key];
+      }
+    }
+    saveNicoSettings();
+  });
+
+  // 初期読み込み
+  loadColorSettings();
+  loadNicoSettings();
+  updateAlphaDisplay();
+  // 起動時に現在の設定をサーバーに送信
+  setTimeout(() => {
+    sendAllSettings();
+  }, 500);
+</script>
 </body>
 </html>

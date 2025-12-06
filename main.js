@@ -22,6 +22,7 @@ let currentColors = {
     colorAuthor: "#ffd8f8",
     alphaAuthor: 100,
     fontSize: 22,
+    avatarSize: 40,
     fontBold: true,
     shadowEnabled: true,
     colorShadow: "#000000",

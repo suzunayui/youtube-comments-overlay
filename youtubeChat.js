@@ -289,6 +289,42 @@ function toHex(v) {
 }
 
 /**
+ * 各 renderer からアイコン画像の URL を取得
+ */
+function extractAuthorPhoto(renderer, msgType) {
+  // 通常・スパチャ・ステッカー・メンバーなど共通
+  if (renderer.authorPhoto?.thumbnails) {
+    const thumbs = renderer.authorPhoto.thumbnails;
+    return thumbs[thumbs.length - 1].url; // 一番大きそうなの
+  }
+
+  // ギフト購入は header.liveChatSponsorshipsHeaderRenderer の中にある
+  if (msgType === "gift_purchase") {
+    const h = renderer.header?.liveChatSponsorshipsHeaderRenderer;
+    if (h?.authorPhoto?.thumbnails) {
+      const thumbs = h.authorPhoto.thumbnails;
+      return thumbs[thumbs.length - 1].url;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 日付フォーマット: YYYY-MM-DD HH:MM:SS
+ */
+function formatDateTime(dt) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const y = dt.getFullYear();
+  const m = pad(dt.getMonth() + 1);
+  const d = pad(dt.getDate());
+  const h = pad(dt.getHours());
+  const mi = pad(dt.getMinutes());
+  const s = pad(dt.getSeconds());
+  return `${y}-${m}-${d} ${h}:${mi}:${s}`;
+}
+
+/**
  * 1回分のチャットを取得して:
  *  - 抽出したメッセージ一覧
  *  - 次の continuation
@@ -475,18 +511,22 @@ async function fetchChatOnce(apiKey, clientVersion, continuation) {
       }
     }
 
+    // アイコンURL
+    const iconUrl = extractAuthorPhoto(renderer, msgType);
+
     const msgId = `${timestampMs}_${author}_${textPlain}_${idx}`;
 
     chatItems.push({
       id: msgId,
       colors: superColors,
       author,
+      icon: iconUrl,        // ★ アイコンURLを追加
       text: textPlain,
       parts,
       timestamp_ms: timestampMs,
       timestamp: timestr,
-      kind: msgType,       // "text", "paid", "sticker", "membership", "gift_purchase", "gift_redeem"
-      amount: amountValue, // int or null
+      kind: msgType,        // "text", "paid", "sticker", "membership", "gift_purchase", "gift_redeem"
+      amount: amountValue,  // int or null
       amount_text: amountText,
     });
   }
@@ -496,20 +536,6 @@ async function fetchChatOnce(apiKey, clientVersion, continuation) {
     extractContinuationData(cont0);
 
   return { chatItems, nextCont, timeoutMs };
-}
-
-/**
- * 日付フォーマット: YYYY-MM-DD HH:MM:SS
- */
-function formatDateTime(dt) {
-  const pad = (n) => String(n).padStart(2, "0");
-  const y = dt.getFullYear();
-  const m = pad(dt.getMonth() + 1);
-  const d = pad(dt.getDate());
-  const h = pad(dt.getHours());
-  const mi = pad(dt.getMinutes());
-  const s = pad(dt.getSeconds());
-  return `${y}-${m}-${d} ${h}:${mi}:${s}`;
 }
 
 // ==============================
