@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Fireworks Canvas</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+  }
+  canvas {
+    display: block;
+    background: transparent;
+  }
+</style>
+</head>
+<body>
+<canvas id="fw-canvas"></canvas>
+
+<script>
+const FW_COLORS = ["#ff6b6b", "#ffd93d", "#6bcbff", "#ff9ff3", "#1dd1a1", "#feca57", "#54a0ff"];
+const FW_SCALE = 2;
+const SNOW_EMOJIS = ["❄", "✻", "✼", "*"];
+const SNOW_EMOJI_COUNT = 35;
+const SNOW_PARTICLE_COUNT = 120;
+
+let canvas, ctx;
+let rockets = [];
+let particles = [];
+let emojiFlakes = [];
+let particleSnow = [];
+let snowInitialized = false;
+let snowActiveUntil = 0;
+
+class Rocket {
+  constructor() {
+    const w = canvas.width;
+    const h = canvas.height;
+    this.x = w * (0.1 + Math.random() * 0.8);
+    this.y = h + 10;
+    this.vx = (Math.random() - 0.5) * 1.2;
+    this.vy = -(6 + Math.random() * 2.5);
+    this.targetY = h * (0.18 + Math.random() * 0.25);
+    this.color = FW_COLORS[(Math.random() * FW_COLORS.length) | 0];
+    this.history = [];
+    this.alive = true;
+  }
+  update() {
+    this.history.push({ x: this.x, y: this.y });
+    if (this.history.length > 12) this.history.shift();
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.08;
+    if (this.vy >= -0.5 || this.y <= this.targetY) {
+      this.alive = false;
+      multiBurst(this.x, this.y, this.color);
+    }
+  }
+  draw() {
+    ctx.lineWidth = 2 * FW_SCALE;
+    for (let i = 0; i < this.history.length - 1; i++) {
+      const p1 = this.history[i];
+      const p2 = this.history[i + 1];
+      const t = i / this.history.length;
+      ctx.strokeStyle = `rgba(255,255,255,${0.2 + t * 0.6})`;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 2.5 * FW_SCALE, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+class Particle {
+  constructor(x, y, color, size, speed, angle, life, sparkle) {
+    this.x = x;
+    this.y = y;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.friction = 0.985;
+    this.gravity = 0.06 + Math.random() * 0.04;
+    this.size = size;
+    this.life = life;
+    this.maxLife = life;
+    this.color = color;
+    this.sparkle = sparkle;
+  }
+  update() {
+    this.vx *= this.friction;
+    this.vy *= this.friction;
+    this.vy += this.gravity;
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life--;
+  }
+  draw() {
+    const t = this.life / this.maxLife;
+    if (t <= 0) return;
+    let alpha = t;
+    if (this.sparkle && (this.life % 5 < 2)) alpha *= 0.35;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * (0.6 + t), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size * 2.5 * t, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  get alive() {
+    return this.life > 0;
+  }
+}
+
+class EmojiFlake {
+  constructor(initial = true) {
+    this.reset(initial);
+  }
+  reset(initial = false) {
+    this.depth = 0.3 + Math.random() * 0.7;
+    this.x = Math.random() * canvas.width;
+    this.y = initial ? Math.random() * canvas.height : -40;
+    this.size = (16 + Math.random() * 20) * (0.6 + this.depth);
+    this.speedY = (0.9 + Math.random() * 1.4) * (0.7 + this.depth);
+    this.speedX = (Math.random() - 0.5) * (0.3 + this.depth * 0.4);
+    this.char = SNOW_EMOJIS[(Math.random() * SNOW_EMOJIS.length) | 0];
+    this.swaySpeed = (0.0015 + Math.random() * 0.0025) * (0.7 + this.depth);
+    this.offset = Math.random() * 1000;
+    this.alpha = 0.3 + this.depth * 0.5;
+  }
+  update(t) {
+    this.y += this.speedY;
+    this.x += this.speedX;
+    this.x += Math.sin(t * this.swaySpeed + this.offset) * (0.5 + this.depth * 0.6);
+    if (this.y > canvas.height + 60 || this.x < -80 || this.x > canvas.width + 80) {
+      this.reset(false);
+    }
+  }
+  draw() {
+    ctx.font = `${this.size}px "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = `rgba(255,255,255,${this.alpha})`;
+    ctx.fillText(this.char, this.x, this.y);
+  }
+}
+
+class SnowParticle {
+  constructor(initial = true) {
+    this.reset(initial);
+  }
+  reset(initial = false) {
+    this.depth = 0.3 + Math.random() * 0.7;
+    this.x = Math.random() * canvas.width;
+    this.y = initial ? Math.random() * canvas.height : -20;
+    this.size = (0.8 + Math.random() * 1.5) * (0.5 + this.depth);
+    this.speedY = (1.0 + Math.random() * 1.4) * (0.7 + this.depth);
+    this.speedX = (Math.random() - 0.5) * (0.25 + this.depth * 0.35);
+    this.alpha = (0.3 + Math.random() * 0.4) * (0.5 + this.depth * 0.7);
+    this.swaySpeed = (0.002 + Math.random() * 0.003) * (0.7 + this.depth);
+    this.offset = Math.random() * 1000;
+  }
+  update(t) {
+    this.y += this.speedY;
+    this.x += this.speedX;
+    this.x += Math.sin(t * this.swaySpeed + this.offset) * (0.3 + this.depth * 0.4);
+    if (this.y > canvas.height + 30 || this.x < -30 || this.x > canvas.width + 30) {
+      this.reset(false);
+    }
+  }
+  draw() {
+    ctx.globalAlpha = this.alpha;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function hexToHsl(hex) {
+  hex = hex.replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+  const r = parseInt(hex.substr(0, 2), 16) / 255;
+  const g = parseInt(hex.substr(2, 2), 16) / 255;
+  const b = parseInt(hex.substr(4, 2), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h *= 60;
+  }
+  return { h, s: s * 100, l: l * 100 };
+}
+
+function burst(x, y, baseColor, count, baseSpeed, scale) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = baseSpeed * (0.5 + Math.random()) * FW_SCALE;
+    const size = (1.8 * scale + Math.random() * 1.5 * scale) * FW_SCALE;
+    const c = hexToHsl(baseColor);
+    const h = (c.h + (Math.random() * 40 - 20) + 360) % 360;
+    const s = Math.min(100, c.s + (Math.random() * 20 - 10));
+    const l = Math.min(70, c.l + (Math.random() * 10 - 5));
+    const color = `hsl(${h},${s}%,${l}%)`;
+    const life = 50 + Math.random() * 40;
+    const sparkle = Math.random() < 0.7;
+    particles.push(new Particle(x, y, color, size, speed, angle, life, sparkle));
+  }
+}
+
+function multiBurst(x, y, baseColor) {
+  burst(x, y, baseColor, 70, 3.5, 1.0);
+  setTimeout(() => burst(x, y, baseColor, 50, 2.8, 0.7), 140);
+  setTimeout(() => burst(x, y, baseColor, 40, 2.2, 0.5), 280);
+}
+
+function resize() {
+  canvas.width = window.innerWidth || 1920;
+  canvas.height = window.innerHeight || 1080;
+}
+
+function ensureSnowInit() {
+  if (snowInitialized) return;
+  for (let i = 0; i < SNOW_EMOJI_COUNT; i++) {
+    emojiFlakes.push(new EmojiFlake(true));
+  }
+  for (let i = 0; i < SNOW_PARTICLE_COUNT; i++) {
+    particleSnow.push(new SnowParticle(true));
+  }
+  snowInitialized = true;
+}
+
+function update() {
+  // 透明を保ったまま前フレームをほぼ消す
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.02)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // スノー（通常合成）
+  const now = performance.now();
+  if (snowActiveUntil > now) {
+    ensureSnowInit();
+    emojiFlakes.forEach((f) => {
+      f.update(now);
+      f.draw();
+    });
+    particleSnow.forEach((p) => {
+      p.update(now);
+      p.draw();
+    });
+  }
+
+  // 発光合成で花火描画
+  ctx.globalCompositeOperation = "lighter";
+  rockets.forEach((r) => r.update());
+  rockets = rockets.filter((r) => r.alive);
+  rockets.forEach((r) => r.draw());
+
+  particles.forEach((p) => p.update());
+  particles = particles.filter((p) => p.alive);
+  particles.forEach((p) => p.draw());
+
+  requestAnimationFrame(update);
+}
+
+function triggerFireworkCanvas(count = 3) {
+  for (let i = 0; i < count; i++) {
+    rockets.push(new Rocket());
+    if (Math.random() < 0.35) rockets.push(new Rocket());
+  }
+}
+
+function init() {
+  canvas = document.getElementById("fw-canvas");
+  ctx = canvas.getContext("2d");
+  resize();
+  window.addEventListener("resize", resize);
+  ctx.globalCompositeOperation = "lighter";
+  update();
+}
+
+// コメントからキーワードを検知して花火を打ち上げる
+const seen = new Set();
+let initialized = false; // 初回は履歴だけ既読にして花火を出さない
+const fireKeywords = ["花火", "はなび", "hanabi", "firework", "fireworks"];
+const snowKeywords = ["雪", "ゆき", "snow"];
+
+function extractText(msg) {
+  if (!msg) return "";
+  if (Array.isArray(msg.parts) && msg.parts.length > 0) {
+    return msg.parts.filter((p) => p.type === "text").map((p) => p.text || "").join(" ");
+  }
+  return msg.text || "";
+}
+
+function containsFirework(msg) {
+  const t = extractText(msg).toLowerCase();
+  if (!t) return false;
+  return fireKeywords.some((k) => t.includes(k));
+}
+
+function containsSnow(msg) {
+  const t = extractText(msg).toLowerCase();
+  if (!t) return false;
+  return snowKeywords.some((k) => t.includes(k));
+}
+
+async function pollComments() {
+  try {
+    const res = await fetch("/comments");
+    const data = await res.json();
+    let sawAny = false;
+    for (const msg of data) {
+      const id = msg.id || (msg.timestamp_ms + "_" + (msg.author || "") + "_" + (msg.text || ""));
+      if (seen.has(id)) continue;
+      sawAny = true;
+      seen.add(id);
+
+      // 初回の履歴は既読扱いでスキップ
+      if (!initialized) continue;
+
+      if (containsFirework(msg)) {
+        // 花火だけ上げる
+        triggerFireworkCanvas(4);
+      }
+      if (containsSnow(msg)) {
+        snowActiveUntil = performance.now() + 9000; // 9秒ほど降らせる
+        ensureSnowInit();
+      }
+    }
+    if (!initialized && sawAny) {
+      initialized = true;
+    }
+  } catch (e) {
+    console.warn("effects poll error", e);
+  }
+}
+
+init();
+setInterval(pollComments, 500);
+</script>
+</body>
+</html>

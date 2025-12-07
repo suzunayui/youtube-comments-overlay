@@ -263,6 +263,10 @@ function createOverlayServer() {
     res.sendFile(path.join(__dirname, "concurrent.html"));
   });
 
+  srv.get("/effects", (req, res) => {
+    res.sendFile(path.join(__dirname, "effects.html"));
+  });
+
   srv.get("/comments", (req, res) => {
     res.json(getComments());
   });
@@ -333,6 +337,7 @@ function createObsLauncherFiles() {
   makeLauncher("niconico-launcher.html", "http://127.0.0.1:5000/niconico");
   makeLauncher("supers-launcher.html", "http://127.0.0.1:5000/supers");
   makeLauncher("concurrent-launcher.html", "http://127.0.0.1:5000/concurrent");
+  makeLauncher("effects-launcher.html", "http://127.0.0.1:5000/effects");
 
   console.log("📁 OBS launcher files created in:", baseDir);
   return baseDir;
