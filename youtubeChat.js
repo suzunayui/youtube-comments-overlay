@@ -623,4 +623,5 @@ module.exports = {
   startLiveChat,
   stopLiveChat,
   getComments,
+  resolveVideoId,
 };
