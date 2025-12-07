@@ -1,4 +1,6 @@
 # 📺 youtube-comments-overlay
+
+![YouTube Comments Overlay Screenshot](https://github.com/suzunayui/youtube-comments-overlay/blob/main/2025-12-07%20(13).png)
 YouTube のコメントを **OBS に表示できるオーバーレイツール** です。
 
 ---
