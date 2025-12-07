@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>Bomb & Cat Escape Animation</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .entity {
+    position: absolute;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .explosion {
+    position: absolute;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0);
+    animation: boom 0.5s ease-out forwards;
+  }
+
+  @keyframes boom {
+    0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+    70%  { transform: translate(-50%, -50%) scale(1.6); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+  }
+
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.9;
+    transform: translate(-50%, -50%);
+    animation: particleMove 0.7s ease-out forwards;
+    pointer-events: none;
+  }
+
+  @keyframes particleMove {
+    from { transform: translate(-50%, -50%) translate(0, 0) scale(1); opacity: 1; }
+    to   { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.1); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<script>
+(() => {
+  const entities = [];
+  const groundOffset = 100;
+
+  // ★ 左向きネコ科4種（今回指定のやつ）
+  const CAT_EMOJIS = ["🐈", "🐈‍⬛", "🐅", "🐆"];
+
+  const CAT_PROBABILITY = 0.2; // 20%で猫になる
+
+  function spawnEntity() {
+    const el = document.createElement("div");
+    el.className = "entity";
+
+    const isBomb = Math.random() > CAT_PROBABILITY;
+    const w = window.innerWidth;
+
+    const startX = Math.random() * (w * 1.2) - w * 0.1;
+    const startY = -150 - Math.random() * 150;
+
+    const vx = (Math.random() * 600) - 300;
+    const initialVy = 100 + Math.random() * 250;
+    const gravity = 700 + Math.random() * 600;
+
+    const sizeScale = isBomb
+      ? 0.6 + Math.random() * 1.8
+      : 0.8 + Math.random() * 1.2;
+
+    const fontBase = isBomb ? 144 : 140;
+    const fontSize = fontBase * sizeScale;
+    el.style.fontSize = fontSize + "px";
+
+    const spinSpeed = isBomb ? (Math.random() * 6 - 3) : 0;
+
+    // 猫：落下後 左 or 右 に逃げる
+    const escapeDir = Math.random() < 0.5 ? "left" : "right";
+
+    el.textContent = isBomb
+      ? "💣"
+      : CAT_EMOJIS[Math.floor(Math.random() * CAT_EMOJIS.length)];
+
+    entities.push({
+      el,
+      kind: isBomb ? "bomb" : "cat",
+      x: startX,
+      y: startY,
+      vx,
+      vy: initialVy,
+      gravity,
+      rotation: 0,
+      spinSpeed,
+      sizeScale,
+      removed: false,
+      escapeDir,
+      escapeMode: false
+    });
+
+    document.body.appendChild(el);
+  }
+
+  function explode(x, y, sizeScale) {
+    const boom = document.createElement("div");
+    boom.className = "explosion";
+    boom.textContent = "💥";
+
+    const explosionSize = 240 * sizeScale;
+    boom.style.fontSize = explosionSize + "px";
+    boom.style.left = x + "px";
+    boom.style.top = y + "px";
+    document.body.appendChild(boom);
+
+    const particleCount = Math.floor(16 * sizeScale + 12);
+    for (let i = 0; i < particleCount; i++) {
+      const p = document.createElement("div");
+      p.className = "particle";
+
+      const angle = Math.random() * Math.PI * 2;
+      const dist = (80 + Math.random() * 100) * sizeScale;
+
+      p.style.width = (8 * sizeScale) + "px";
+      p.style.height = (8 * sizeScale) + "px";
+
+      const colors = ["orange", "gold", "yellow", "red", "white"];
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+      p.style.left = x + "px";
+      p.style.top = y + "px";
+      p.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+      p.style.setProperty("--dy", Math.sin(angle) * dist + "px");
+
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 800);
+    }
+
+    setTimeout(() => boom.remove(), 600);
+  }
+
+  let lastTime = performance.now();
+
+  function loop(now) {
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    const h = window.innerHeight;
+    const groundY = h - groundOffset;
+
+    for (let i = entities.length - 1; i >= 0; i--) {
+      const e = entities[i];
+      if (e.removed) continue;
+
+      // ★ 逃走モードの猫
+      if (e.kind === "cat" && e.escapeMode) {
+        const runSpeed = 400 * e.sizeScale;
+        const dir = e.escapeDir === "right" ? 1 : -1;
+
+        e.x += dir * runSpeed * dt;
+        e.y = groundY; // 床の高さに固定
+
+        // 向き：右は反転
+        const flip = e.escapeDir === "right" ? -1 : 1;
+        e.el.style.transform =
+          `translate(-50%, -50%) scaleX(${flip})`;
+
+        e.el.style.left = e.x + "px";
+        e.el.style.top = e.y + "px";
+
+        // 画面外へ出たら消す
+        if (e.x < -200 || e.x > window.innerWidth + 200) {
+          e.removed = true;
+          e.el.remove();
+          entities.splice(i, 1);
+        }
+        continue;
+      }
+
+      // ★ 重力落下（全エンティティ共通）
+      e.vy += e.gravity * dt;
+      e.x += e.vx * dt;
+      e.y += e.vy * dt;
+      e.rotation += e.spinSpeed * dt;
+
+      e.el.style.left = e.x + "px";
+      e.el.style.top = e.y + "px";
+      e.el.style.transform =
+        `translate(-50%, -50%) rotate(${e.rotation}rad)`;
+
+      if (e.kind === "bomb") {
+        if (e.y >= groundY) {
+          e.removed = true;
+          explode(e.x, groundY, e.sizeScale);
+          e.el.remove();
+          entities.splice(i, 1);
+        }
+      } else {
+        // ★ 猫：地面についたら逃走モードへ
+        if (e.y >= groundY) {
+          e.escapeMode = true;
+          e.vx = 0;
+          e.vy = 0;
+          e.rotation = 0;
+        }
+
+        // 落ちすぎた保険
+        if (e.y > h + 300) {
+          e.removed = true;
+          e.el.remove();
+          entities.splice(i, 1);
+        }
+      }
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  // ★ 投下
+  setInterval(() => {
+    spawnEntity();
+    if (Math.random() < 0.35) {
+      setTimeout(spawnEntity, 250);
+    }
+  }, 1400);
+
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>

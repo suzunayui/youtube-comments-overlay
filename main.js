@@ -248,6 +248,9 @@ function isWindowAlive() {
 function createOverlayServer() {
   const srv = express();
 
+  // Serve static assets (JS modules, CSS, etc.)
+  srv.use(express.static(__dirname));
+
   srv.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "overlay.html"));
   });
