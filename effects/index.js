@@ -2,17 +2,23 @@ import { createFireworks } from "./fireworks.js";
 import { createSnowEffect } from "./snow.js";
 import { createHearts } from "./hearts.js";
 import { createStars } from "./stars.js";
-import { containsFirework, containsSnow, containsHeart, containsStar } from "./keywords.js";
+import { containsFirework, containsSnow, containsHeart, containsStar, containsExplosion, containsTikuwa } from "./keywords.js";
+import { createExplosionEffect } from "./explosion.js";
+import { createTikuwaEffect } from "./tikuwa.js";
 
 const canvas = document.getElementById("fw-canvas");
 const starsCanvas = document.getElementById("stars-canvas");
 const heartsLayer = document.getElementById("hearts-layer");
+const explosionLayer = document.getElementById("explosion-layer");
+const tikuwaCanvas = document.getElementById("tikuwa-canvas");
 const ctx = canvas.getContext("2d");
 
 const fireworks = createFireworks({ canvas, ctx });
 const snow = createSnowEffect({ canvas, ctx });
 const hearts = createHearts(heartsLayer);
 const stars = createStars(starsCanvas);
+const explosion = createExplosionEffect(explosionLayer);
+const tikuwa = createTikuwaEffect(tikuwaCanvas);
 
 const seen = new Set();
 let initialized = false;
@@ -25,6 +31,7 @@ function resize() {
   fireworks.resize();
   snow.resize();
   stars.resize();
+  tikuwa.resize();
 }
 
 function frame() {
@@ -49,6 +56,12 @@ function handleMessage(msg) {
   if (containsHeart(msg)) {
     hearts.trigger();
   }
+  if (containsExplosion(msg)) {
+    explosion.trigger();
+  }
+  if (containsTikuwa(msg)) {
+    tikuwa.trigger();
+  }
 }
 
 async function pollManualTriggers() {
@@ -68,6 +81,12 @@ async function pollManualTriggers() {
           break;
         case "star":
           stars.trigger();
+          break;
+        case "explosion":
+          explosion.trigger();
+          break;
+        case "tikuwa":
+          tikuwa.trigger();
           break;
       }
     }

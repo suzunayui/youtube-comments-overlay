@@ -287,7 +287,7 @@ function createOverlayServer() {
   });
   triggerRouter.post("/", (req, res) => {
     const t = (req.body && req.body.type) || "";
-    const allowed = new Set(["firework", "snow", "heart", "star"]);
+    const allowed = new Set(["firework", "snow", "heart", "star", "explosion", "tikuwa"]);
     if (!allowed.has(t)) {
       return res.status(400).json({ ok: false, error: "invalid type" });
     }
