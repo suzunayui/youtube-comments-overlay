@@ -44,6 +44,7 @@ let currentColors = {
     alphaShadow: 100
   }
 };
+const effectTriggers = [];
 
 // ==============================
 // 同時接続数の監視（Playwright で watch ページを読む）
@@ -271,6 +272,31 @@ function createOverlayServer() {
     res.json(getComments());
   });
 
+  // エフェクト手動トリガー API
+  const triggerRouter = express.Router();
+  triggerRouter.use(express.json());
+  triggerRouter.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+  triggerRouter.post("/", (req, res) => {
+    const t = (req.body && req.body.type) || "";
+    const allowed = new Set(["firework", "snow", "heart", "star"]);
+    if (!allowed.has(t)) {
+      return res.status(400).json({ ok: false, error: "invalid type" });
+    }
+    effectTriggers.push({ type: t, at: Date.now() });
+    res.json({ ok: true });
+  });
+  triggerRouter.get("/pull", (req, res) => {
+    const out = effectTriggers.splice(0, effectTriggers.length);
+    res.json(out);
+  });
+  srv.use("/trigger-effect", triggerRouter);
+
   srv.get("/api/concurrent", (req, res) => {
     res.json({
       viewers: currentViewers,
@@ -348,11 +374,11 @@ function createObsLauncherFiles() {
  */
 function createMainWindow(launchersDir) {
   mainWindow = new BrowserWindow({
-    width: 920,
-    height: 520,
+    width: 1200,
+    height: 620,
     resizable: true,
-    minWidth: 800,
-    minHeight: 450,
+    minWidth: 1000,
+    minHeight: 540,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,

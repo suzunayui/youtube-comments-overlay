@@ -11,22 +11,118 @@
     background: transparent;
   }
   canvas {
+    position: fixed;
+    inset: 0;
     display: block;
+    width: 100vw;
+    height: 100vh;
     background: transparent;
+    pointer-events: none;
+  }
+  #fw-canvas { z-index: 1; }
+  #stars-canvas { z-index: 2; }
+  .hearts {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .heart-wrap {
+    position: absolute;
+    bottom: -60px;
+    animation-name: float-up;
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+  }
+  .heart {
+    display: inline-block;
+    animation:
+      sway 2.4s ease-in-out infinite alternate,
+      glow 2s ease-in-out infinite alternate;
+    opacity: 1;
+  }
+  @keyframes float-up {
+    0% {
+      transform: translateY(0) scale(0.7);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    50% {
+      transform: translateY(-50vh) scale(1);
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-105vh) scale(1.25);
+      opacity: 0;
+    }
+  }
+  @keyframes sway {
+    0% {
+      transform: translateX(-18px) rotate(-8deg);
+    }
+    50% {
+      transform: translateX(0px) rotate(3deg);
+    }
+    100% {
+      transform: translateX(18px) rotate(8deg);
+    }
+  }
+  @keyframes glow {
+    0% {
+      text-shadow:
+        0 0 2px rgba(255, 200, 210, 0.5),
+        0 0 8px rgba(255, 120, 150, 0.4);
+    }
+    50% {
+      text-shadow:
+        0 0 4px rgba(255, 230, 240, 0.9),
+        0 0 16px rgba(255, 150, 180, 0.8);
+    }
+    100% {
+      text-shadow:
+        0 0 2px rgba(255, 200, 210, 0.5),
+        0 0 8px rgba(255, 120, 150, 0.4);
+    }
   }
 </style>
 </head>
 <body>
 <canvas id="fw-canvas"></canvas>
+<canvas id="stars-canvas"></canvas>
+<div class="hearts" id="hearts-layer"></div>
 
 <script>
 const FW_COLORS = ["#ff6b6b", "#ffd93d", "#6bcbff", "#ff9ff3", "#1dd1a1", "#feca57", "#54a0ff"];
 const FW_SCALE = 2;
 const SNOW_COUNT = 120;
 const SPARKLE_COUNT = 40;
-const SNOW_EMOJIS = ["❄", "⛄", "🎄", "✻", "✼", "*"];
+const SNOW_EMOJIS = ["\u2744", "\u26c4", "\u{1F384}", "\u273b", "\u273c", "*"];
+const HEART_COLORS = ["#ffffff", "#ffb3d9", "#ff6b9d", "#ff3b5c", "#ff9999"];
+const HEART_CHARS = ["\u2764", "\u2661", "\u{1F496}", "\u{1F497}"];
+const HEART_KEYWORDS = ["かわいい", "可愛い", "ハート", "heart", "すき", "好き", "like", "love"];
+const STAR_SPAWN_INTERVAL = 120;
+const STAR_GLOW_COLORS = ["#ff3bff", "#ff9bff", "#ff6b6b", "#ffcc00", "#ffee00", "#99ff66", "#66ddff", "#66aaff", "#cc99ff", "#ff6699", "#ff8844", "#ffb347", "#ffffff"];
+const STAR_GLYPHS = ["\u2b50", "\u{1F31F}", "\u2726", "\u2727", "\u2729", "\u272a"];
+const STAR_KEYWORDS = ["星", "ほし", "流れ星", "流星", "star", "stars", "shooting star", "shooting-star", "shooting stars", "shootingstars", "meteor", "meteor shower", "hoshi", "nagareboshi"];
 
 let canvas, ctx;
+let heartsContainer;
+let heartTimer = null;
+let heartActiveUntil = 0;
+let starsCanvas, starsCtx;
+let starWidth = 1920;
+let starHeight = 1080;
+let shootingStars = [];
+let starParticles = [];
+let starActiveUntil = 0;
+let starLastSpawn = 0;
+let starLastFrame = 0;
+let starLoopRunning = false;
 let rockets = [];
 let particles = [];
 let snowParticles = [];
@@ -198,6 +294,213 @@ function createSparkle(x, y) {
   };
 }
 
+function starRand(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function starPick(arr) {
+  return arr[(Math.random() * arr.length) | 0];
+}
+
+function spawnShootingStar() {
+  const startX = starRand(starWidth * 0.1, starWidth + 400);
+  const startY = starRand(-starHeight * 0.3, starHeight * 1);
+
+  const angleDeg = 135 + starRand(-10, 10);
+  const angle = (angleDeg * Math.PI) / 180;
+
+  const speed = starRand(600, 1200);
+  const vx = Math.cos(angle) * speed;
+  const vy = Math.sin(angle) * speed;
+
+  const len = starRand(80, 200);
+  const color = starPick(STAR_GLOW_COLORS);
+  const life = starRand(1.2, 2.2);
+  const size = starRand(48, 144);
+  const spinSpeed = starRand(-2, 2);
+
+  shootingStars.push({
+    x: startX,
+    y: startY,
+    vx,
+    vy,
+    length: len,
+    color,
+    life,
+    age: 0,
+    glyph: starPick(STAR_GLYPHS),
+    size,
+    spin: 0,
+    spinSpeed,
+  });
+}
+
+function spawnStarParticles(x, y, baseColor) {
+  const count = Math.floor(starRand(6, 14));
+  for (let i = 0; i < count; i++) {
+    const angle = starRand(0, Math.PI * 2);
+    const speed = starRand(20, 160);
+    starParticles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: starRand(1, 4),
+      life: starRand(0.3, 0.9),
+      age: 0,
+      color: baseColor,
+    });
+  }
+}
+
+function drawShootingStar(s) {
+  const angle = Math.atan2(s.vy, s.vx);
+  const tailX = s.x - Math.cos(angle) * s.length;
+  const tailY = s.y - Math.sin(angle) * s.length;
+
+  const grad = starsCtx.createLinearGradient(s.x, s.y, tailX, tailY);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.2, s.color);
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+
+  starsCtx.lineWidth = 2.8;
+  starsCtx.strokeStyle = grad;
+  starsCtx.beginPath();
+  starsCtx.moveTo(s.x, s.y);
+  starsCtx.lineTo(tailX, tailY);
+  starsCtx.stroke();
+
+  starsCtx.save();
+  starsCtx.translate(s.x, s.y);
+  starsCtx.rotate(s.spin);
+  starsCtx.font = `${s.size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", system-ui, sans-serif`;
+  starsCtx.textAlign = "center";
+  starsCtx.textBaseline = "middle";
+  starsCtx.shadowColor = s.color;
+  starsCtx.shadowBlur = 30;
+  starsCtx.fillStyle = "#fff";
+  starsCtx.fillText(s.glyph, 0, 0);
+  starsCtx.restore();
+}
+
+function drawStarParticle(p) {
+  const alpha = 1 - p.age / p.life;
+  if (alpha <= 0) return;
+  starsCtx.globalAlpha = alpha;
+  starsCtx.fillStyle = p.color;
+  starsCtx.beginPath();
+  starsCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+  starsCtx.fill();
+  starsCtx.globalAlpha = 1;
+}
+
+function starLoop(now) {
+  const dt = (now - starLastFrame) / 1000;
+  starLastFrame = now;
+
+  starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+  starsCtx.globalCompositeOperation = "lighter";
+
+  if (now < starActiveUntil && now - starLastSpawn > STAR_SPAWN_INTERVAL) {
+    spawnShootingStar();
+    if (Math.random() < 0.35) spawnShootingStar();
+    starLastSpawn = now;
+  }
+
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const s = shootingStars[i];
+    s.age += dt;
+    if (s.age > s.life) {
+      shootingStars.splice(i, 1);
+      continue;
+    }
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.spin += s.spinSpeed * dt;
+
+    if (Math.random() < 0.6) {
+      spawnStarParticles(s.x, s.y, s.color);
+    }
+
+    drawShootingStar(s);
+  }
+
+  for (let i = starParticles.length - 1; i >= 0; i--) {
+    const p = starParticles[i];
+    p.age += dt;
+    if (p.age > p.life) {
+      starParticles.splice(i, 1);
+      continue;
+    }
+    p.vx *= 0.98;
+    p.vy = p.vy * 0.98 + 5 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    drawStarParticle(p);
+  }
+
+  starsCtx.globalCompositeOperation = "source-over";
+
+  if (now < starActiveUntil || shootingStars.length || starParticles.length) {
+    requestAnimationFrame(starLoop);
+  } else {
+    starLoopRunning = false;
+    starsCtx.clearRect(0, 0, starsCanvas.width, starsCanvas.height);
+  }
+}
+
+function triggerShootingStars() {
+  if (!starsCtx) return;
+  const now = performance.now();
+  starActiveUntil = Math.max(starActiveUntil, now + 9000);
+  if (!starLoopRunning) {
+    starLoopRunning = true;
+    starLastFrame = now;
+    starLastSpawn = now;
+    requestAnimationFrame(starLoop);
+  }
+}
+
+function createHeart() {
+  if (!heartsContainer) return;
+  const wrap = document.createElement("div");
+  wrap.classList.add("heart-wrap");
+
+  const heart = document.createElement("span");
+  heart.classList.add("heart");
+  heart.style.color = HEART_COLORS[(Math.random() * HEART_COLORS.length) | 0];
+  heart.style.fontSize = 40 + Math.random() * 60 + "px";
+  heart.textContent = HEART_CHARS[(Math.random() * HEART_CHARS.length) | 0];
+
+  wrap.style.left = Math.random() * 100 + "vw";
+  const duration = 6 + Math.random() * 4;
+  wrap.style.animationDuration = duration + "s";
+  wrap.style.animationDelay = -Math.random() * duration + "s";
+
+  wrap.appendChild(heart);
+  heartsContainer.appendChild(wrap);
+
+  setTimeout(() => wrap.remove(), (duration + 2) * 1000);
+}
+
+function triggerHeartsBurst() {
+  const now = performance.now();
+  heartActiveUntil = Math.max(heartActiveUntil, now + 6500);
+  if (!heartTimer) {
+    heartTimer = setInterval(() => {
+      if (performance.now() > heartActiveUntil) {
+        clearInterval(heartTimer);
+        heartTimer = null;
+        return;
+      }
+      createHeart();
+    }, 160);
+  }
+  for (let i = 0; i < 15; i++) {
+    setTimeout(createHeart, i * 120);
+  }
+}
+
 function burst(x, y, baseColor, count, baseSpeed, scale) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -221,8 +524,18 @@ function multiBurst(x, y, baseColor) {
 }
 
 function resize() {
-  canvas.width = window.innerWidth || 1920;
-  canvas.height = window.innerHeight || 1080;
+  const w = window.innerWidth || 1920;
+  const h = window.innerHeight || 1080;
+  canvas.width = w;
+  canvas.height = h;
+  if (starsCanvas && starsCtx) {
+    const dpr = window.devicePixelRatio || 1;
+    starWidth = w;
+    starHeight = h;
+    starsCanvas.width = w * dpr;
+    starsCanvas.height = h * dpr;
+    starsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
 }
 
 function ensureSnowInit() {
@@ -317,6 +630,9 @@ function triggerFireworkCanvas(count = 3) {
 function init() {
   canvas = document.getElementById("fw-canvas");
   ctx = canvas.getContext("2d");
+  starsCanvas = document.getElementById("stars-canvas");
+  starsCtx = starsCanvas.getContext("2d");
+  heartsContainer = document.getElementById("hearts-layer");
   resize();
   window.addEventListener("resize", resize);
   ctx.globalCompositeOperation = "lighter";
@@ -348,6 +664,43 @@ function containsSnow(msg) {
   if (!t) return false;
   return snowKeywords.some((k) => t.includes(k));
 }
+
+function containsHeart(msg) {
+  const t = extractText(msg).toLowerCase();
+  if (!t) return false;
+  return HEART_KEYWORDS.some((k) => t.includes(k));
+}
+
+function containsStar(msg) {
+  const t = extractText(msg).toLowerCase();
+  if (!t) return false;
+  return STAR_KEYWORDS.some((k) => t.includes(k));
+}
+
+async function pollManualTriggers() {
+  try {
+    const res = await fetch("/trigger-effect/pull");
+    const events = await res.json();
+    for (const ev of events) {
+      switch (ev.type) {
+        case "firework":
+          triggerFireworkCanvas(4);
+          break;
+        case "snow":
+          snowActiveUntil = performance.now() + 9000;
+          break;
+        case "heart":
+          triggerHeartsBurst();
+          break;
+        case "star":
+          triggerShootingStars();
+          break;
+      }
+    }
+  } catch (e) {
+    console.warn("manual effects poll error", e);
+  }
+}
 async function pollComments() {
   try {
     const res = await fetch("/comments");
@@ -369,6 +722,12 @@ async function pollComments() {
       if (containsSnow(msg)) {
         snowActiveUntil = performance.now() + 9000; // 9秒ほど降らせる
       }
+      if (containsStar(msg)) {
+        triggerShootingStars();
+      }
+      if (containsHeart(msg)) {
+        triggerHeartsBurst();
+      }
     }
     if (!initialized && sawAny) {
       initialized = true;
@@ -380,6 +739,7 @@ async function pollComments() {
 
 init();
 setInterval(pollComments, 500);
+setInterval(pollManualTriggers, 500);
 </script>
 </body>
 </html>
