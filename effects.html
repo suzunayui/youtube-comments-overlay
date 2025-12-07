@@ -22,15 +22,14 @@
 <script>
 const FW_COLORS = ["#ff6b6b", "#ffd93d", "#6bcbff", "#ff9ff3", "#1dd1a1", "#feca57", "#54a0ff"];
 const FW_SCALE = 2;
-const SNOW_EMOJIS = ["❄", "✻", "✼", "*"];
-const SNOW_EMOJI_COUNT = 35;
-const SNOW_PARTICLE_COUNT = 120;
+const SNOW_COUNT = 120;
+const SPARKLE_COUNT = 40;
+const SNOW_EMOJIS = ["❄", "⛄", "🎄", "✻", "✼", "*"];
 
 let canvas, ctx;
 let rockets = [];
 let particles = [];
-let emojiFlakes = [];
-let particleSnow = [];
+let snowParticles = [];
 let snowInitialized = false;
 let snowActiveUntil = 0;
 
@@ -120,70 +119,32 @@ class Particle {
   }
 }
 
-class EmojiFlake {
-  constructor(initial = true) {
-    this.reset(initial);
-  }
-  reset(initial = false) {
-    this.depth = 0.3 + Math.random() * 0.7;
-    this.x = Math.random() * canvas.width;
-    this.y = initial ? Math.random() * canvas.height : -40;
-    this.size = (16 + Math.random() * 20) * (0.6 + this.depth);
-    this.speedY = (0.9 + Math.random() * 1.4) * (0.7 + this.depth);
-    this.speedX = (Math.random() - 0.5) * (0.3 + this.depth * 0.4);
-    this.char = SNOW_EMOJIS[(Math.random() * SNOW_EMOJIS.length) | 0];
-    this.swaySpeed = (0.0015 + Math.random() * 0.0025) * (0.7 + this.depth);
-    this.offset = Math.random() * 1000;
-    this.alpha = 0.3 + this.depth * 0.5;
-  }
-  update(t) {
-    this.y += this.speedY;
-    this.x += this.speedX;
-    this.x += Math.sin(t * this.swaySpeed + this.offset) * (0.5 + this.depth * 0.6);
-    if (this.y > canvas.height + 60 || this.x < -80 || this.x > canvas.width + 80) {
-      this.reset(false);
-    }
-  }
-  draw() {
-    ctx.font = `${this.size}px "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = `rgba(255,255,255,${this.alpha})`;
-    ctx.fillText(this.char, this.x, this.y);
-  }
+function createSnow(x, y) {
+  return {
+    type: "snow",
+    x,
+    y,
+    r: 3 + Math.random() * 4,
+    vy: 0.5 + Math.random() * 1.2,
+    vx: -0.4 + Math.random() * 0.8,
+    alpha: 0.5 + Math.random() * 0.5,
+    twinkleSpeed: 0.002 + Math.random() * 0.003,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  };
 }
 
-class SnowParticle {
-  constructor(initial = true) {
-    this.reset(initial);
-  }
-  reset(initial = false) {
-    this.depth = 0.3 + Math.random() * 0.7;
-    this.x = Math.random() * canvas.width;
-    this.y = initial ? Math.random() * canvas.height : -20;
-    this.size = (0.8 + Math.random() * 1.5) * (0.5 + this.depth);
-    this.speedY = (1.0 + Math.random() * 1.4) * (0.7 + this.depth);
-    this.speedX = (Math.random() - 0.5) * (0.25 + this.depth * 0.35);
-    this.alpha = (0.3 + Math.random() * 0.4) * (0.5 + this.depth * 0.7);
-    this.swaySpeed = (0.002 + Math.random() * 0.003) * (0.7 + this.depth);
-    this.offset = Math.random() * 1000;
-  }
-  update(t) {
-    this.y += this.speedY;
-    this.x += this.speedX;
-    this.x += Math.sin(t * this.swaySpeed + this.offset) * (0.3 + this.depth * 0.4);
-    if (this.y > canvas.height + 30 || this.x < -30 || this.x > canvas.width + 30) {
-      this.reset(false);
-    }
-  }
-  draw() {
-    ctx.globalAlpha = this.alpha;
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+function createSparkle(x, y) {
+  return {
+    type: "sparkle",
+    x,
+    y,
+    r: 2.5 + Math.random() * 2.5,
+    vy: 0.3 + Math.random() * 0.8,
+    vx: -0.3 + Math.random() * 0.6,
+    alpha: 0.6 + Math.random() * 0.4,
+    twinkleSpeed: 0.004 + Math.random() * 0.004,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  };
 }
 
 function hexToHsl(hex) {
@@ -207,6 +168,34 @@ function hexToHsl(hex) {
     h *= 60;
   }
   return { h, s: s * 100, l: l * 100 };
+}
+
+function createSnow(x, y) {
+  return {
+    type: "snow",
+    x,
+    y,
+    r: 2 + Math.random() * 3,
+    vy: 0.5 + Math.random() * 1.2,
+    vx: -0.4 + Math.random() * 0.8,
+    alpha: 0.5 + Math.random() * 0.5,
+    twinkleSpeed: 0.002 + Math.random() * 0.003,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  };
+}
+
+function createSparkle(x, y) {
+  return {
+    type: "sparkle",
+    x,
+    y,
+    r: 1.5 + Math.random() * 2,
+    vy: 0.3 + Math.random() * 0.8,
+    vx: -0.3 + Math.random() * 0.6,
+    alpha: 0.6 + Math.random() * 0.4,
+    twinkleSpeed: 0.004 + Math.random() * 0.004,
+    twinkleOffset: Math.random() * Math.PI * 2,
+  };
 }
 
 function burst(x, y, baseColor, count, baseSpeed, scale) {
@@ -238,32 +227,70 @@ function resize() {
 
 function ensureSnowInit() {
   if (snowInitialized) return;
-  for (let i = 0; i < SNOW_EMOJI_COUNT; i++) {
-    emojiFlakes.push(new EmojiFlake(true));
+  for (let i = 0; i < SNOW_COUNT; i++) {
+    snowParticles.push(createSnow(Math.random() * canvas.width, Math.random() * canvas.height));
   }
-  for (let i = 0; i < SNOW_PARTICLE_COUNT; i++) {
-    particleSnow.push(new SnowParticle(true));
+  for (let i = 0; i < SPARKLE_COUNT; i++) {
+    snowParticles.push(createSparkle(Math.random() * canvas.width, Math.random() * canvas.height));
   }
   snowInitialized = true;
 }
 
 function update() {
-  // 透明を保ったまま前フレームをほぼ消す
+  // 毎フレーム完全クリアして透過を維持
   ctx.globalCompositeOperation = "source-over";
-  ctx.fillStyle = "rgba(0, 0, 0, 0.02)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // スノー（通常合成）
   const now = performance.now();
   if (snowActiveUntil > now) {
     ensureSnowInit();
-    emojiFlakes.forEach((f) => {
-      f.update(now);
-      f.draw();
-    });
-    particleSnow.forEach((p) => {
-      p.update(now);
-      p.draw();
+    snowParticles.forEach((p) => {
+      // update
+      p.y += p.vy;
+      p.x += p.vx;
+      const tw = 0.5 + 0.5 * Math.sin(now * p.twinkleSpeed + p.twinkleOffset);
+      p.x += Math.sin(now * p.twinkleSpeed + p.twinkleOffset) * (p.type === "snow" ? 0.6 : 0.4);
+      if (p.y > canvas.height + 20) {
+        p.y = -10;
+        p.x = Math.random() * canvas.width;
+      }
+      if (p.x < -20) p.x = canvas.width + 10;
+      if (p.x > canvas.width + 20) p.x = -10;
+
+      // draw
+      ctx.save();
+      ctx.globalAlpha = p.alpha * tw;
+      ctx.fillStyle = "#ffffff";
+      if (p.type === "snow") {
+        // 絵文字スノーを混ぜる
+        if (Math.random() < 0.4) {
+          const emoji = SNOW_EMOJIS[(Math.random() * SNOW_EMOJIS.length) | 0];
+          ctx.font = `${p.r * 4}px "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = "rgba(255,255,255,0.9)";
+          ctx.fillText(emoji, p.x, p.y);
+        } else {
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = "rgba(255,255,255,0.8)";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "rgba(255,255,255,1)";
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - p.r);
+        ctx.lineTo(p.x + p.r, p.y);
+        ctx.lineTo(p.x, p.y + p.r);
+        ctx.lineTo(p.x - p.r, p.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
     });
   }
 
@@ -321,7 +348,6 @@ function containsSnow(msg) {
   if (!t) return false;
   return snowKeywords.some((k) => t.includes(k));
 }
-
 async function pollComments() {
   try {
     const res = await fetch("/comments");
@@ -342,7 +368,6 @@ async function pollComments() {
       }
       if (containsSnow(msg)) {
         snowActiveUntil = performance.now() + 9000; // 9秒ほど降らせる
-        ensureSnowInit();
       }
     }
     if (!initialized && sawAny) {
