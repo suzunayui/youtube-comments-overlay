@@ -26,13 +26,14 @@
     background: transparent;
     pointer-events: none;
   }
-  #tikuwa-canvas { z-index: 0; }
-  #fw-canvas { z-index: 1; }
-  #stars-canvas { z-index: 2; }
+  #sirakaba-canvas { z-index: 0; }
+  #tikuwa-canvas { z-index: 1; }
+  #fw-canvas { z-index: 2; }
+  #stars-canvas { z-index: 3; }
   .hearts {
     position: fixed;
     inset: 0;
-    z-index: 3;
+    z-index: 4;
     pointer-events: none;
     overflow: hidden;
   }
@@ -100,6 +101,7 @@
 </style>
 </head>
 <body>
+<canvas id="sirakaba-canvas"></canvas>
 <canvas id="fw-canvas"></canvas>
 <canvas id="tikuwa-canvas"></canvas>
 <canvas id="stars-canvas"></canvas>

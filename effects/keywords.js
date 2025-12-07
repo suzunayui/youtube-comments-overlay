@@ -68,6 +68,16 @@ const TIKUWA_KEYWORDS = [
   "tetsuarei"
 ];
 
+// SIRAKABA: Japanese for birch / romanized variants
+const SIRAKABA_KEYWORDS = [
+  "\u767d\u6a39", // white birch kanji
+  "\u3057\u3089\u304b\u3070", // shirakaba hiragana
+  "\u30b7\u30e9\u30ab\u30d0", // シラカバ
+  "sirakaba",
+  "shirakaba",
+  "birch"
+];
+
 export function extractText(msg) {
   if (!msg) return "";
   if (Array.isArray(msg.parts) && msg.parts.length > 0) {
@@ -110,4 +120,10 @@ export function containsTikuwa(msg) {
   const t = extractText(msg).toLowerCase();
   if (!t) return false;
   return TIKUWA_KEYWORDS.some((k) => t.includes(k));
+}
+
+export function containsSirakaba(msg) {
+  const t = extractText(msg).toLowerCase();
+  if (!t) return false;
+  return SIRAKABA_KEYWORDS.some((k) => t.includes(k));
 }

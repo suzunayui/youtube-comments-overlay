@@ -98,9 +98,10 @@ function parseLikesLabel(label) {
   return null;
 }
 
-async function readCountsFromPage(page) {
+async function readCountsFromPage(page, fetchLikes = true) {
   try {
-    return await page.evaluate(() => {
+    return await page.evaluate(
+      (opts) => {
       function parseConcurrent(str) {
         if (!str) return null;
         const mJa = str.match(/([\d,\.]+)\s*人が視聴中/);
@@ -125,15 +126,20 @@ async function readCountsFromPage(page) {
         "";
       const viewers = parseConcurrent(viewStr);
 
-      const likeBtn = document.querySelector("like-button-view-model button");
-      const likeStr =
-        (likeBtn &&
-          (likeBtn.getAttribute("aria-label") || likeBtn.textContent)) ||
-        "";
-      const likes = parseLikes(likeStr);
+        let likes = null;
+        if (opts.fetchLikes) {
+          const likeBtn = document.querySelector("like-button-view-model button");
+          const likeStr =
+            (likeBtn &&
+              (likeBtn.getAttribute("aria-label") || likeBtn.textContent)) ||
+            "";
+          likes = parseLikes(likeStr);
+        }
 
-      return { viewers, likes };
-    });
+        return { viewers, likes };
+    },
+      { fetchLikes }
+    );
   } catch (_) {
     return { viewers: null, likes: null };
   }
@@ -143,6 +149,7 @@ async function runConcurrentWatcher(videoId) {
   currentViewers = 0;
   concurrentStop = false;
 
+  let lastLikesFetch = 0;
   try {
     concurrentBrowser = await chromium.launch({
       headless: true,
@@ -166,7 +173,9 @@ async function runConcurrentWatcher(videoId) {
     let lastLikes = null;
     let likesStaleCount = 0;
     while (!concurrentStop && concurrentVideoId === videoId) {
-      const { viewers, likes } = await readCountsFromPage(concurrentPage);
+      const nowTs = Date.now();
+      const fetchLikes = nowTs - lastLikesFetch >= 60000;
+      const { viewers, likes } = await readCountsFromPage(concurrentPage, fetchLikes);
 
       if (typeof viewers === "number" && viewers !== last) {
         last = viewers;
@@ -174,13 +183,17 @@ async function runConcurrentWatcher(videoId) {
         console.log("同接更新(playwright):", viewers);
         retries = 0;
       }
-      if (typeof likes === "number" && likes !== lastLikes) {
-        lastLikes = likes;
-        currentLikes = likes;
-        console.log("高評価(playwright):", likes);
-        likesStaleCount = 0;
-      } else if (typeof likes === "number") {
-        likesStaleCount += 1;
+      if (fetchLikes) {
+        if (typeof likes === "number" && likes !== lastLikes) {
+          lastLikes = likes;
+          currentLikes = likes;
+          lastLikesFetch = nowTs;
+          console.log("高評価(playwright):", likes);
+          likesStaleCount = 0;
+        } else if (typeof likes === "number") {
+          likesStaleCount += 1;
+          lastLikesFetch = nowTs;
+        }
       }
 
       if (
@@ -200,7 +213,7 @@ async function runConcurrentWatcher(videoId) {
         await concurrentPage.waitForTimeout(1000);
       }
 
-      await concurrentPage.waitForTimeout(10000);
+      await concurrentPage.waitForTimeout(20000);
     }
   } catch (e) {
     console.warn("同接ウォッチエラー:", e?.message || e);
@@ -287,7 +300,7 @@ function createOverlayServer() {
   });
   triggerRouter.post("/", (req, res) => {
     const t = (req.body && req.body.type) || "";
-    const allowed = new Set(["firework", "snow", "heart", "star", "explosion", "tikuwa"]);
+    const allowed = new Set(["firework", "snow", "heart", "star", "explosion", "tikuwa", "sirakaba"]);
     if (!allowed.has(t)) {
       return res.status(400).json({ ok: false, error: "invalid type" });
     }

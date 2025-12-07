@@ -443,6 +443,9 @@
             <button data-effect="snow">雪</button>
             <button data-effect="heart">ハート</button>
             <button data-effect="star">流れ星</button>
+            <button data-effect="explosion">爆発</button>
+            <button data-effect="tikuwa">ちくわ/鉄アレイ</button>
+            <button data-effect="sirakaba">シラカバ</button>
           </div>
           <div id="effectStatus">クリックでエフェクトを送信できます。</div>
         </div>
@@ -523,6 +526,9 @@
       snow: "雪",
       heart: "ハート",
       star: "流れ星",
+      explosion: "爆発",
+      tikuwa: "ちくわ/鉄アレイ",
+      sirakaba: "シラカバ"
     }[type] || type;
     effectStatus.textContent = `${label} を送信中…`;
     try {
