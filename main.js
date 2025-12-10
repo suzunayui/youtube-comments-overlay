@@ -5,6 +5,7 @@ const fs = require("fs");
 const express = require("express");
 const http = require("http");
 const { chromium } = require("playwright");
+const { initChatStore, closeChatStore, getDbPath, getRecentComments } = require("./chatStore");
 
 const {
   startLiveChat,
@@ -284,8 +285,23 @@ function createOverlayServer() {
     res.sendFile(path.join(__dirname, "effects.html"));
   });
 
-  srv.get("/comments", (req, res) => {
-    res.json(getComments());
+  srv.get("/comments", async (req, res) => {
+    const limit = parseInt(req.query.limit, 10);
+    try {
+      const rows = await getRecentComments(limit);
+      if (rows.length > 0) {
+        return res.json(rows);
+      }
+    } catch (e) {
+      console.warn("getRecentComments error:", e?.message || e);
+    }
+    // DB が空 / 読み込み失敗時はインメモリを返す
+    const fallback = getComments();
+    res.json(
+      Number.isFinite(limit) && limit > 0
+        ? fallback.slice(-limit)
+        : fallback
+    );
   });
 
   // エフェクト手動トリガー API
@@ -485,6 +501,9 @@ ipcMain.on("colors:update", (_event, settings) => {
 // ==============================
 
 app.whenReady().then(() => {
+  const chatDbPath = initChatStore(app.getPath("userData"));
+  console.log("SQLite chat DB:", chatDbPath);
+
   createOverlayServer();
 
   // 起動時にランチャーHTMLを生成
@@ -502,11 +521,13 @@ app.whenReady().then(() => {
 app.on("before-quit", () => {
   stopLiveChat();
   stopConcurrentWatcher();
+  closeChatStore();
 });
 
 app.on("window-all-closed", () => {
   stopLiveChat();
   stopConcurrentWatcher();
+  closeChatStore();
   if (process.platform !== "darwin") {
     app.quit();
   }

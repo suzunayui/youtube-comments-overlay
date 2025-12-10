@@ -6,6 +6,7 @@
 // ==============================
 const MAX_COMMENTS = 50;
 const comments = [];
+const chatStore = require("./chatStore");
 
 let stopFlag = false;
 let running = false;
@@ -18,6 +19,7 @@ function pushComment(msg) {
   if (comments.length > MAX_COMMENTS) {
     comments.splice(0, comments.length - MAX_COMMENTS);
   }
+  chatStore.saveComment(msg);
 }
 
 function getComments() {
@@ -590,6 +592,7 @@ async function startLiveChat(inputStr) {
         continuation = nextCont;
 
         for (const msg of chatItems) {
+          msg.video_id = videoId;
           pushComment(msg);
         }
 

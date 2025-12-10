@@ -96,6 +96,31 @@
     margin: 0 4px;
   }
 
+  /* スパチャ額ごとの色 (YouTube色が無いときのフォールバック) */
+  .msg-paid-tier1 {
+    background: var(--color-tier1, #1565c0);
+    box-shadow: 0 0 14px rgba(21, 101, 192, 0.9);
+  }
+
+  .msg-paid-tier2 {
+    background: var(--color-tier2, #00897b);
+    box-shadow: 0 0 14px rgba(0, 137, 123, 0.9);
+  }
+
+  .msg-paid-tier3 {
+    background: var(--color-tier3, #f9a825);
+    box-shadow: 0 0 16px rgba(249, 168, 37, 0.95);
+    color: #111;
+    text-shadow:
+      0 0 3px rgba(255,255,255,0.7),
+      0 0 6px rgba(255,255,255,0.7);
+  }
+
+  .msg-paid-tier4 {
+    background: var(--color-tier4, #c2185b);
+    box-shadow: 0 0 18px rgba(194, 24, 91, 0.98);
+  }
+
   @keyframes fadein {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -183,6 +208,18 @@
         // ギフト・メンバーシップ系は緑に固定
         if (kind === "membership" || kind === "gift_purchase" || kind === "gift_redeem") {
           cls.push("msg-kind-membership");
+        } else if (kind === "paid" || kind === "sticker") {
+          if (!colors || (!colors.body_bg && !colors.body_text)) {
+            if (amount >= 10000) {
+              cls.push("msg-paid-tier4");
+            } else if (amount >= 2000) {
+              cls.push("msg-paid-tier3");
+            } else if (amount >= 500) {
+              cls.push("msg-paid-tier2");
+            } else {
+              cls.push("msg-paid-tier1");
+            }
+          }
         }
 
         div.className = cls.join(" ");
