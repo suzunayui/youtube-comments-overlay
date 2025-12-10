@@ -61,8 +61,11 @@
 <body>
 
 <script>
-let initialized = false;     // ★ 初回「履歴スキップ」モードかどうか
+// 履歴は after パラメータでフィルタするため、初回スキップは行わない
+let initialized = true;
 let seen = new Set();
+// 直近数秒は拾うようにオフセットして履歴爆流しを防止
+let sinceTs = Date.now() - 5000;
 
 /* ------------------ 設定取得 ------------------ */
 async function fetchAndApplySettings() {
@@ -356,24 +359,21 @@ function spawnScrollingBullet(msg) {
 ------------------------------------------------------------ */
 async function fetchComments() {
     try {
-        const res = await fetch("/comments");
+        const res = await fetch(`/comments?after=${sinceTs}`);
         const data = await res.json();
 
         let sawAnyInThisBatch = false;
+        let maxTs = sinceTs;
 
         for (const msg of data) {
             const id = msg.id || (msg.timestamp_ms + "_" + (msg.author || "") + "_" + (msg.text || ""));
 
-            if (!initialized) {
-                // 初回モード中：履歴として既読扱いのみ
-                seen.add(id);
-                sawAnyInThisBatch = true;
-                continue;
-            }
-
             if (!seen.has(id)) {
                 seen.add(id);
                 sawAnyInThisBatch = true;
+                if (msg.timestamp_ms && msg.timestamp_ms > maxTs) {
+                    maxTs = msg.timestamp_ms;
+                }
 
                 // ★ 絵文字のみ5個以下 → 落下演出
                 if (isShortEmojiOnly(msg)) {
@@ -384,10 +384,8 @@ async function fetchComments() {
             }
         }
 
-        if (!initialized && sawAnyInThisBatch) {
-            initialized = true;
-            console.log("NICONICO overlay initialized: history skipped.");
-        }
+        // 次回以降は今回の最新 timestamp_ms より新しいものだけ取得する
+        sinceTs = maxTs;
 
     } catch (err) {
         console.error("fetch error:", err);

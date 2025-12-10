@@ -207,7 +207,9 @@
     text-align: right;
   }
 
-  #btnResetColors {
+  #btnResetColors,
+  #btnResetSupers,
+  #btnResetNico {
     margin-top: 8px;
     padding: 5px 10px;
     font-size: 11px;
@@ -218,7 +220,9 @@
     color: #fff;
   }
 
-  #btnResetColors:hover {
+  #btnResetColors:hover,
+  #btnResetSupers:hover,
+  #btnResetNico:hover {
     background: #888;
   }
 
@@ -436,6 +440,79 @@
       </div>
 
       <div class="settings-col">
+        <div class="color-settings">
+          <h2>💎 Supers オーバーレイ設定</h2>
+
+          <div class="color-row">
+            <label>フォント</label>
+            <select id="supersFontFamily">
+              <optgroup label="— Webフォント —">
+                <option value="Noto Sans JP">Noto Sans JP</option>
+                <option value="M PLUS Rounded 1c">M PLUS Rounded 1c</option>
+                <option value="M PLUS 1p">M PLUS 1p</option>
+                <option value="Kosugi Maru">小杉丸ゴシック</option>
+                <option value="Zen Maru Gothic">Zen Maru Gothic</option>
+                <option value="BIZ UDGothic">BIZ UDゴシック</option>
+                <option value="Klee One">Klee One</option>
+                <option value="Yusei Magic">Yusei Magic</option>
+                <option value="Hachi Maru Pop">はちまるポップ</option>
+              </optgroup>
+              <optgroup label="— システムフォント —">
+                <option value="Yu Gothic">游ゴシック</option>
+                <option value="Meiryo">メイリオ</option>
+                <option value="MS Gothic">MS ゴシック</option>
+                <option value="Arial">Arial</option>
+              </optgroup>
+              <optgroup id="supersInstalledFontsGroup" label="— インストール済み —">
+              </optgroup>
+            </select>
+          </div>
+          <div class="color-row">
+            <label>背景色</label>
+            <input type="color" id="supersColorNormal" value="#000000" />
+            <input type="range" id="supersAlphaNormal" min="0" max="100" value="100" />
+            <span class="alpha-value" id="supersAlphaNormalVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>文字色</label>
+            <input type="color" id="supersColorText" value="#ffffff" />
+            <input type="range" id="supersAlphaText" min="0" max="100" value="100" />
+            <span class="alpha-value" id="supersAlphaTextVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>投稿者名</label>
+            <input type="color" id="supersColorAuthor" value="#ffd8f8" />
+            <input type="range" id="supersAlphaAuthor" min="0" max="100" value="100" />
+            <span class="alpha-value" id="supersAlphaAuthorVal">100%</span>
+          </div>
+          <div class="color-row">
+            <label>サイズ (px)</label>
+            <input type="number" id="supersFontSize" value="22" min="10" max="48" />
+          </div>
+          <div class="color-row">
+            <label>アイコンサイズ (px)</label>
+            <input type="number" id="supersAvatarSize" value="40" min="16" max="120" />
+          </div>
+          <div class="color-row">
+            <label>太字</label>
+            <input type="checkbox" id="supersFontBold" checked />
+          </div>
+          <div class="color-row">
+            <label>影</label>
+            <input type="checkbox" id="supersShadowEnabled" checked />
+            <input type="color" id="supersColorShadow" value="#000000" />
+            <input type="range" id="supersAlphaShadow" min="0" max="100" value="90" />
+            <span class="alpha-value" id="supersAlphaShadowVal">90%</span>
+          </div>
+          <div class="color-row">
+            <label>メンバー背景</label>
+            <input type="color" id="supersColorMembership" value="#1e7d32" />
+            <input type="range" id="supersAlphaMembership" min="0" max="100" value="100" />
+            <span class="alpha-value" id="supersAlphaMembershipVal">100%</span>
+          </div>
+          <button id="btnResetSupers">デフォルトに戻す</button>
+        </div>
+
         <div class="effect-box">
           <h2>✨ エフェクト手動トリガー</h2>
           <div class="effect-buttons">
@@ -552,6 +629,7 @@
   async function detectInstalledFonts() {
     const installedGroup = document.getElementById("installedFontsGroup");
     const nicoInstalledGroup = document.getElementById("nicoInstalledFontsGroup");
+    const supersInstalledGroup = document.getElementById("supersInstalledFontsGroup");
     
     // Local Font Access API が使える場合
     if ("queryLocalFonts" in window) {
@@ -599,6 +677,11 @@
           option2.value = family;
           option2.textContent = family;
           nicoInstalledGroup.appendChild(option2);
+
+          const option3 = document.createElement("option");
+          option3.value = family;
+          option3.textContent = family;
+          supersInstalledGroup.appendChild(option3);
         }
       } catch (e) {
         console.log("Font detection not available:", e);
@@ -612,6 +695,27 @@
   const COLOR_KEY = "yt-overlay-colors";
 
   const defaultColors = {
+    fontFamily: "Noto Sans JP",
+    colorNormal: "#000000",
+    alphaNormal: 100,
+    colorText: "#ffffff",
+    alphaText: 100,
+    colorAuthor: "#ffd8f8",
+    alphaAuthor: 100,
+    fontSize: 22,
+    avatarSize: 40,
+    fontBold: true,
+    shadowEnabled: true,
+    colorShadow: "#000000",
+    alphaShadow: 90,
+    colorMembership: "#1e7d32",
+    alphaMembership: 100
+  };
+
+  // ========== Supers 設定 ==========
+  const SUPERS_KEY = "yt-overlay-supers";
+
+  const defaultSupers = {
     fontFamily: "Noto Sans JP",
     colorNormal: "#000000",
     alphaNormal: 100,
@@ -645,6 +749,24 @@
     alphaShadow: document.getElementById("alphaShadow"),
     colorMembership: document.getElementById("colorMembership"),
     alphaMembership: document.getElementById("alphaMembership")
+  };
+
+  const supersInputs = {
+    fontFamily: document.getElementById("supersFontFamily"),
+    colorNormal: document.getElementById("supersColorNormal"),
+    alphaNormal: document.getElementById("supersAlphaNormal"),
+    colorText: document.getElementById("supersColorText"),
+    alphaText: document.getElementById("supersAlphaText"),
+    colorAuthor: document.getElementById("supersColorAuthor"),
+    alphaAuthor: document.getElementById("supersAlphaAuthor"),
+    fontSize: document.getElementById("supersFontSize"),
+    avatarSize: document.getElementById("supersAvatarSize"),
+    fontBold: document.getElementById("supersFontBold"),
+    shadowEnabled: document.getElementById("supersShadowEnabled"),
+    colorShadow: document.getElementById("supersColorShadow"),
+    alphaShadow: document.getElementById("supersAlphaShadow"),
+    colorMembership: document.getElementById("supersColorMembership"),
+    alphaMembership: document.getElementById("supersAlphaMembership")
   };
 
   // ========== ニコニコ風設定 ==========
@@ -683,6 +805,14 @@
         valEl.textContent = colorInputs[key].value + "%";
       }
     }
+    // Supers用
+    const supersAlphaKeys = ["alphaNormal", "alphaText", "alphaAuthor", "alphaShadow", "alphaMembership"];
+    for (const key of supersAlphaKeys) {
+      const valEl = document.getElementById("supers" + key.charAt(0).toUpperCase() + key.slice(1) + "Val");
+      if (valEl && supersInputs[key]) {
+        valEl.textContent = supersInputs[key].value + "%";
+      }
+    }
     // ニコニコ用
     const nicoAlphaKeys = ["alphaText", "alphaShadow"];
     for (const key of nicoAlphaKeys) {
@@ -701,6 +831,18 @@
         colorInputs[key].checked = colors[key] ?? defaultColors[key];
       } else {
         colorInputs[key].value = colors[key] ?? defaultColors[key];
+      }
+    }
+  }
+
+  function loadSupersSettings() {
+    const saved = localStorage.getItem(SUPERS_KEY);
+    const supers = saved ? JSON.parse(saved) : defaultSupers;
+    for (const key in supersInputs) {
+      if (supersInputs[key].type === "checkbox") {
+        supersInputs[key].checked = supers[key] ?? defaultSupers[key];
+      } else {
+        supersInputs[key].value = supers[key] ?? defaultSupers[key];
       }
     }
   }
@@ -731,6 +873,20 @@
     sendAllSettings();
   }
 
+  function saveSupersSettings() {
+    const supers = {};
+    for (const key in supersInputs) {
+      if (supersInputs[key].type === "checkbox") {
+        supers[key] = supersInputs[key].checked;
+      } else {
+        supers[key] = supersInputs[key].value;
+      }
+    }
+    localStorage.setItem(SUPERS_KEY, JSON.stringify(supers));
+    updateAlphaDisplay();
+    sendAllSettings();
+  }
+
   function saveNicoSettings() {
     const nico = {};
     for (const key in nicoInputs) {
@@ -747,16 +903,22 @@
 
   function sendAllSettings() {
     const colorsSaved = localStorage.getItem(COLOR_KEY);
+    const supersSaved = localStorage.getItem(SUPERS_KEY);
     const nicoSaved = localStorage.getItem(NICO_KEY);
     const colors = colorsSaved ? JSON.parse(colorsSaved) : defaultColors;
+    const supers = supersSaved ? JSON.parse(supersSaved) : defaultSupers;
     const nico = nicoSaved ? JSON.parse(nicoSaved) : defaultNico;
-    ipcRenderer.send("colors:update", { overlay: colors, nico: nico });
+    ipcRenderer.send("colors:update", { overlay: colors, supers: supers, nico: nico });
   }
 
   // 各入力の変更を監視
   for (const key in colorInputs) {
     colorInputs[key].addEventListener("input", saveColorSettings);
     colorInputs[key].addEventListener("change", saveColorSettings);
+  }
+  for (const key in supersInputs) {
+    supersInputs[key].addEventListener("input", saveSupersSettings);
+    supersInputs[key].addEventListener("change", saveSupersSettings);
   }
   for (const key in nicoInputs) {
     nicoInputs[key].addEventListener("input", saveNicoSettings);
@@ -774,6 +936,17 @@
     saveColorSettings();
   });
 
+  document.getElementById("btnResetSupers").addEventListener("click", () => {
+    for (const key in supersInputs) {
+      if (supersInputs[key].type === "checkbox") {
+        supersInputs[key].checked = defaultSupers[key];
+      } else {
+        supersInputs[key].value = defaultSupers[key];
+      }
+    }
+    saveSupersSettings();
+  });
+
   document.getElementById("btnResetNico").addEventListener("click", () => {
     for (const key in nicoInputs) {
       if (nicoInputs[key].type === "checkbox") {
@@ -787,6 +960,7 @@
 
   // 初期読み込み
   loadColorSettings();
+  loadSupersSettings();
   loadNicoSettings();
   updateAlphaDisplay();
   // 起動時に現在の設定をサーバーに送信

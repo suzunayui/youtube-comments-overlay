@@ -4,8 +4,6 @@
 // ==============================
 // 内部状態
 // ==============================
-const MAX_COMMENTS = 50;
-const comments = [];
 const chatStore = require("./chatStore");
 
 let stopFlag = false;
@@ -15,15 +13,13 @@ let running = false;
 // 共通ユーティリティ
 // ==============================
 function pushComment(msg) {
-  comments.push(msg);
-  if (comments.length > MAX_COMMENTS) {
-    comments.splice(0, comments.length - MAX_COMMENTS);
-  }
+  // DB のみに保存する（メモリには保持しない）
   chatStore.saveComment(msg);
 }
 
 function getComments() {
-  return comments.slice();
+  // メモリ保持は不要なので空配列を返す
+  return [];
 }
 
 function sleep(ms) {
@@ -516,7 +512,13 @@ async function fetchChatOnce(apiKey, clientVersion, continuation) {
     // アイコンURL
     const iconUrl = extractAuthorPhoto(renderer, msgType);
 
-    const msgId = `${timestampMs}_${author}_${textPlain}_${idx}`;
+    // YouTube が返す一意な ID があればそれを使う。なければ従来の生成ルール。
+    const rawId =
+      renderer.id ||
+      renderer.messageId ||
+      renderer.trackingParams ||
+      null;
+    const msgId = String(rawId || `${timestampMs}_${author}_${textPlain}_${idx}`);
 
     chatItems.push({
       id: msgId,
@@ -557,9 +559,6 @@ async function startLiveChat(inputStr) {
 
   running = true;
   stopFlag = false;
-
-  // 過去のコメントをクリア
-  comments.length = 0;
 
   try {
     const videoId = await resolveVideoId(inputStr);

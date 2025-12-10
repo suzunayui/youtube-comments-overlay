@@ -147,7 +147,7 @@
   // 設定を取得して適用
   async function fetchAndApplySettings() {
     try {
-      const res = await fetch("/settings/colors");
+      const res = await fetch("/settings/supers");
       const colors = await res.json();
       const root = document.documentElement;
       

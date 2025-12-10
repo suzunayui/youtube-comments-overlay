@@ -105,7 +105,7 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
     const lim = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : DEFAULT_LIMIT;
     const sql = `SELECT id, video_id, timestamp_ms, timestamp, author, text, kind, amount, amount_text, icon, parts_json, colors_json
                  FROM comments
-                 ORDER BY timestamp_ms ASC, rowid ASC
+                 ORDER BY timestamp_ms DESC, rowid DESC
                  LIMIT ?`;
     db.all(sql, [lim], (err, rows) => {
       if (err) {
@@ -113,7 +113,8 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
         resolve([]);
         return;
       }
-      const result = rows.map((r) => {
+      // DBからは新しい順で取得しているので、描画順を自然にするために逆順に戻す
+      const result = rows.reverse().map((r) => {
         let parts = [];
         let colors = null;
         try {

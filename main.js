@@ -33,6 +33,23 @@ let currentColors = {
     colorMembership: "#1e7d32",
     alphaMembership: 100
   },
+  supers: {
+    fontFamily: "Noto Sans JP",
+    colorNormal: "#000000",
+    alphaNormal: 100,
+    colorText: "#ffffff",
+    alphaText: 100,
+    colorAuthor: "#ffd8f8",
+    alphaAuthor: 100,
+    fontSize: 22,
+    avatarSize: 40,
+    fontBold: true,
+    shadowEnabled: true,
+    colorShadow: "#000000",
+    alphaShadow: 90,
+    colorMembership: "#1e7d32",
+    alphaMembership: 100
+  },
   nico: {
     fontFamily: "Noto Sans JP",
     colorText: "#ffffff",
@@ -287,21 +304,45 @@ function createOverlayServer() {
 
   srv.get("/comments", async (req, res) => {
     const limit = parseInt(req.query.limit, 10);
+    const after = parseInt(req.query.after, 10);
+    const afterMs = Number.isFinite(after) ? after : null;
+    const LIM = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : null;
+    const fetchLimit = LIM ?? 500; // after フィルタ用に多めに取得
     try {
-      const rows = await getRecentComments(limit);
+      const rows = await getRecentComments(fetchLimit);
       if (rows.length > 0) {
-        return res.json(rows);
+          // id 重複を排除し、timestamp_ms 昇順に整列
+          const uniq = new Map();
+          for (const r of rows) {
+            const key = `${r.timestamp_ms || 0}_${r.author || ""}_${r.text || ""}`;
+            if (!uniq.has(key)) uniq.set(key, r);
+          }
+          let out = Array.from(uniq.values()).sort(
+            (a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0)
+          );
+          if (afterMs != null) {
+            out = out.filter((r) => (r.timestamp_ms || 0) > afterMs);
+          }
+          if (LIM) {
+            out = out.slice(-LIM);
+          }
+          return res.json(out);
       }
     } catch (e) {
       console.warn("getRecentComments error:", e?.message || e);
     }
     // DB が空 / 読み込み失敗時はインメモリを返す
     const fallback = getComments();
-    res.json(
-      Number.isFinite(limit) && limit > 0
-        ? fallback.slice(-limit)
-        : fallback
-    );
+    let trimmed = LIM ? fallback.slice(-LIM) : fallback;
+    if (afterMs != null) {
+      trimmed = trimmed.filter((r) => (r.timestamp_ms || 0) > afterMs);
+    }
+    const uniq = new Map();
+    for (const r of trimmed) {
+      const key = `${r.timestamp_ms || 0}_${r.author || ""}_${r.text || ""}`;
+      if (!uniq.has(key)) uniq.set(key, r);
+    }
+    res.json(Array.from(uniq.values()));
   });
 
   // エフェクト手動トリガー API
@@ -340,6 +381,11 @@ function createOverlayServer() {
   // オーバーレイ設定を取得するエンドポイント
   srv.get("/settings/colors", (req, res) => {
     res.json(currentColors.overlay);
+  });
+
+  // Supers 設定を取得するエンドポイント
+  srv.get("/settings/supers", (req, res) => {
+    res.json(currentColors.supers);
   });
 
   // ニコニコ風設定を取得するエンドポイント
@@ -489,6 +535,9 @@ ipcMain.on("launchers:open", () => {
 ipcMain.on("colors:update", (_event, settings) => {
   if (settings.overlay) {
     currentColors.overlay = settings.overlay;
+  }
+  if (settings.supers) {
+    currentColors.supers = settings.supers;
   }
   if (settings.nico) {
     currentColors.nico = settings.nico;
