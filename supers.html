@@ -135,6 +135,9 @@
 
   let rendered = new Set();
 
+  // 現在の配信（動画ID）を保持して古い配信を除外
+  let currentVideoId = null;
+
   // Supers として扱う種類
   const allowedKinds = new Set([
     "paid",
@@ -183,10 +186,30 @@
     }
   }
 
+  // 最新コメントの video_id を拾って現在の配信IDとみなす
+  function findLatestVideoId(data) {
+    let latest = null;
+    for (const msg of data) {
+      if (!msg || !msg.video_id) continue;
+      const ts = Number.isFinite(msg.timestamp_ms) ? msg.timestamp_ms : 0;
+      if (!latest || ts > latest.ts) {
+        latest = { id: msg.video_id, ts };
+      }
+    }
+    return latest ? latest.id : null;
+  }
+
   async function fetchComments() {
     try {
       const res = await fetch("/comments");
       const data = await res.json();
+
+      const newVideoId = findLatestVideoId(data);
+      if (newVideoId && newVideoId !== currentVideoId) {
+        currentVideoId = newVideoId;
+        rendered.clear();
+        chat.innerHTML = "";
+      }
 
       data.sort((a, b) => a.timestamp_ms - b.timestamp_ms);
 
@@ -194,6 +217,9 @@
         const kind   = msg.kind || "text";
         const amount = msg.amount || 0;
         const colors = msg.colors || null;
+
+        // 現在の配信IDと異なるものはスキップ
+        if (currentVideoId && msg.video_id !== currentVideoId) continue;
 
         // 通常チャットは表示しない
         if (!allowedKinds.has(kind)) continue;

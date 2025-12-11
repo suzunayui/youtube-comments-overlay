@@ -280,7 +280,7 @@ function spawnFallingEmoji(msg) {
 /* ------------------------------------------------------------
    通常のニコニコ弾幕（右→左へ10秒で流れる）
 ------------------------------------------------------------ */
-function spawnScrollingBullet(msg) {
+function spawnScrollingBullet(msg, { onComplete, color } = {}) {
     const div = document.createElement("div");
     div.className = "bullet";
     const content = document.createElement("span");
@@ -331,6 +331,10 @@ function spawnScrollingBullet(msg) {
         const visibleDuration = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scroll-duration')) || 8;
         const speed = (w + size.width) / visibleDuration; // px/sec
 
+        if (color) {
+            div.style.color = color;
+        }
+
         let lastTime = null;
 
         function step(timestamp) {
@@ -342,6 +346,9 @@ function spawnScrollingBullet(msg) {
             div.style.left = x + "px";
 
             if (x + size.width < 0) {
+                if (typeof onComplete === "function") {
+                    onComplete();
+                }
                 div.remove();
                 return;
             }
@@ -376,10 +383,16 @@ async function fetchComments() {
                 }
 
                 // ★ 絵文字のみ5個以下 → 落下演出
+                const hasChisai = containsChisai(msg);
+
                 if (isShortEmojiOnly(msg)) {
                     spawnFallingEmoji(msg);
                 } else {
-                    spawnScrollingBullet(msg);
+                    spawnScrollingBullet(msg, {
+                        onComplete: hasChisai
+                            ? () => spawnScrollingBullet({ text: "ちっちゃくないよ💢" }, { color: "#ff0000" })
+                            : undefined,
+                    });
                 }
             }
         }
@@ -395,6 +408,16 @@ async function fetchComments() {
 /* ポーリング（0.5秒ごと） */
 setInterval(fetchComments, 500);
 fetchComments();
+
+// 「小さい」が含まれるか判定（parts の text も対象）
+function containsChisai(msg) {
+    const target = "小さい";
+    if (typeof msg?.text === "string" && msg.text.includes(target)) return true;
+    if (Array.isArray(msg?.parts)) {
+        return msg.parts.some((p) => p.type === "text" && typeof p.text === "string" && p.text.includes(target));
+    }
+    return false;
+}
 </script>
 
 </body>
