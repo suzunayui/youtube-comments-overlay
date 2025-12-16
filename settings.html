@@ -542,7 +542,6 @@
   const launchersPathEl = document.getElementById("launchersPath");
   const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
   const effectStatus = document.getElementById("effectStatus");
-
   const KEY = "yt-overlay-input";
   const EFFECT_ENDPOINT = "http://127.0.0.1:5000/trigger-effect";
 
@@ -551,6 +550,7 @@
     if (saved) {
       inputTarget.value = saved;
     }
+
   });
 
   btnStart.addEventListener("click", () => {
@@ -924,6 +924,7 @@
     nicoInputs[key].addEventListener("input", saveNicoSettings);
     nicoInputs[key].addEventListener("change", saveNicoSettings);
   }
+
 
   document.getElementById("btnResetColors").addEventListener("click", () => {
     for (const key in colorInputs) {

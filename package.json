@@ -1,6 +1,6 @@
 {
   "name": "yt-overlay",
-  "version": "2025.12.8",
+  "version": "2025.12.17",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -23,8 +23,8 @@
     }
   },
   "dependencies": {
+    "better-sqlite3": "^12.5.0",
     "express": "^5.2.1",
-    "playwright": "^1.57.0",
-    "sqlite3": "^5.1.7"
+    "playwright": "^1.57.0"
   }
 }

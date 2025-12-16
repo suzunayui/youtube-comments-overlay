@@ -5,7 +5,15 @@ const fs = require("fs");
 const express = require("express");
 const http = require("http");
 const { chromium } = require("playwright");
-const { initChatStore, closeChatStore, getDbPath, getRecentComments } = require("./chatStore");
+const {
+  initChatStore,
+  closeChatStore,
+  getDbPath,
+  getRecentComments,
+  getBossState,
+  applyBossHit,
+  resetBossState,
+} = require("./chatStore");
 
 const {
   startLiveChat,
@@ -75,6 +83,9 @@ let concurrentContext = null;
 let concurrentPage = null;
 let concurrentLoop = null;
 let concurrentStop = false;
+const debugConcurrent = process.env.DEBUG_CONCURRENT === "1";
+// Default OFF; set DEBUG_UNDERRPG=1 (or add `?debug=1`) to enable.
+const debugUnderrpg = process.env.DEBUG_UNDERRPG === "1";
 
 async function closeConcurrentBrowser() {
   if (concurrentPage) {
@@ -198,7 +209,7 @@ async function runConcurrentWatcher(videoId) {
       if (typeof viewers === "number" && viewers !== last) {
         last = viewers;
         currentViewers = viewers;
-        console.log("同接更新(playwright):", viewers);
+        if (debugConcurrent) console.log("同接更新(playwright):", viewers);
         retries = 0;
       }
       if (fetchLikes) {
@@ -206,7 +217,7 @@ async function runConcurrentWatcher(videoId) {
           lastLikes = likes;
           currentLikes = likes;
           lastLikesFetch = nowTs;
-          console.log("高評価(playwright):", likes);
+          if (debugConcurrent) console.log("高評価(playwright):", likes);
           likesStaleCount = 0;
         } else if (typeof likes === "number") {
           likesStaleCount += 1;
@@ -220,13 +231,15 @@ async function runConcurrentWatcher(videoId) {
         retries < 2
       ) {
         retries += 1;
-        console.warn("視聴数/高評価が取得できず再読込します (retry:", retries, ")");
+        if (debugConcurrent) {
+          console.warn("視聴数/高評価が取得できず再読込します (retry:", retries, ")");
+        }
         await concurrentPage.reload({ waitUntil: "domcontentloaded" });
         await concurrentPage.waitForTimeout(1000);
       } else if (likesStaleCount >= 6) {
         // 高評価がしばらく変わっていない場合、更新が止まっている可能性があるので再読込
         likesStaleCount = 0;
-        console.warn("高評価が更新されないため再読込します");
+        if (debugConcurrent) console.warn("高評価が更新されないため再読込します");
         await concurrentPage.reload({ waitUntil: "domcontentloaded" });
         await concurrentPage.waitForTimeout(1000);
       }
@@ -252,7 +265,7 @@ function startConcurrentWatcher(videoId) {
   stopConcurrentWatcher();
 
   concurrentVideoId = videoId;
-  console.log("同接ウォッチ開始(playwright):", videoId);
+  if (debugConcurrent) console.log("同接ウォッチ開始(playwright):", videoId);
   concurrentLoop = runConcurrentWatcher(videoId);
 }
 
@@ -300,6 +313,178 @@ function createOverlayServer() {
 
   srv.get("/effects", (req, res) => {
     res.sendFile(path.join(__dirname, "effects.html"));
+  });
+
+  srv.get("/rpgoverlay", (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(path.join(__dirname, "underrpg.html"));
+  });
+
+  async function fetchOverlayRows(limit, afterMs) {
+    const LIM = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : 50;
+    const fetchLimit = Math.min(500, Math.max(50, LIM * 3));
+
+    const normalizeIconUrl = (icon) => {
+      if (typeof icon !== "string") return null;
+      const s = icon.trim();
+      if (!s) return null;
+      if (s.startsWith("//")) return "https:" + s;
+      if (s.startsWith("http://")) return "https://" + s.slice("http://".length);
+      return s;
+    };
+
+    const normalize = (r) => {
+      const ts = Number(r.timestamp_ms) || 0;
+      const author = typeof r.author === "string" ? r.author : "";
+      const text = typeof r.text === "string" ? r.text : "";
+      const id = r.id != null ? String(r.id) : `${ts}_${author}_${text}`;
+      return { id, icon: normalizeIconUrl(r.icon), author, text, timestamp_ms: ts };
+    };
+
+    try {
+      const rows = await getRecentComments(fetchLimit);
+      const uniq = new Map();
+      for (const r of rows) {
+        const item = normalize(r);
+        if (!uniq.has(item.id)) uniq.set(item.id, item);
+      }
+      let out = Array.from(uniq.values()).sort((a, b) => a.timestamp_ms - b.timestamp_ms);
+      if (Number.isFinite(afterMs) && afterMs > 0) {
+        out = out.filter((r) => r.timestamp_ms > afterMs);
+      }
+      return out.slice(-LIM);
+    } catch (_) {
+      const fallback = (getComments() || []).map(normalize);
+      const uniq = new Map();
+      for (const r of fallback) {
+        if (!uniq.has(r.id)) uniq.set(r.id, r);
+      }
+      let out = Array.from(uniq.values()).sort((a, b) => a.timestamp_ms - b.timestamp_ms);
+      if (Number.isFinite(afterMs) && afterMs > 0) {
+        out = out.filter((r) => r.timestamp_ms > afterMs);
+      }
+      return out.slice(-LIM);
+    }
+  }
+
+  srv.get("/api/recent", async (req, res) => {
+    const reqDebug = debugUnderrpg || req.query.debug === "1";
+    const limit = parseInt(req.query.limit, 10);
+    const rows = await fetchOverlayRows(limit, null);
+    if (reqDebug) {
+      const withIcon = rows.filter((r) => typeof r.icon === "string" && r.icon.length > 0).length;
+      console.log(
+        `[underrpg] /api/recent limit=${Number.isFinite(limit) ? limit : "?"} rows=${rows.length} withIcon=${withIcon}`
+      );
+      if (rows.length > 0) {
+        console.log("[underrpg] /api/recent sample:", {
+          id: rows[rows.length - 1].id,
+          author: rows[rows.length - 1].author,
+          icon: rows[rows.length - 1].icon,
+          timestamp_ms: rows[rows.length - 1].timestamp_ms,
+        });
+      }
+    }
+    res.json(
+      rows.map(({ id, icon, author, text, timestamp_ms }) => ({ id, icon, author, text, timestamp_ms }))
+    );
+  });
+
+  srv.get("/api/events", (req, res) => {
+    const reqDebug = debugUnderrpg || req.query.debug === "1";
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+    let lastAfterMs = parseInt(req.query.after, 10);
+    if (!Number.isFinite(lastAfterMs)) lastAfterMs = 0;
+
+    if (reqDebug) {
+      console.log("[underrpg] /api/events connect", {
+        ip: req.ip,
+        ua: req.headers["user-agent"],
+        after: lastAfterMs,
+      });
+    }
+
+    let sentTotal = 0;
+    let lastLogTs = 0;
+    let loggedNullIcon = false;
+
+    const timer = setInterval(async () => {
+      try {
+        const rows = await fetchOverlayRows(50, lastAfterMs);
+        const now = Date.now();
+        if (reqDebug && now - lastLogTs > 5000) {
+          const withIcon = rows.filter((r) => typeof r.icon === "string" && r.icon.length > 0).length;
+          console.log(
+            `[underrpg] /api/events tick rows=${rows.length} withIcon=${withIcon} after=${lastAfterMs} sentTotal=${sentTotal}`
+          );
+          lastLogTs = now;
+        }
+        for (const row of rows) {
+          if (reqDebug && !loggedNullIcon && !row.icon) {
+            loggedNullIcon = true;
+            console.log("[underrpg] /api/events null icon sample:", {
+              id: row.id,
+              author: row.author,
+              timestamp_ms: row.timestamp_ms,
+            });
+          }
+          if (row.timestamp_ms > lastAfterMs) lastAfterMs = row.timestamp_ms;
+          res.write(
+            `data: ${JSON.stringify({
+              id: row.id,
+              icon: row.icon,
+              author: row.author,
+              text: row.text,
+              timestamp_ms: row.timestamp_ms,
+            })}\n\n`
+          );
+          sentTotal += 1;
+        }
+      } catch (_) {}
+    }, 500);
+
+    const keepAlive = setInterval(() => {
+      try {
+        res.write(": keepalive\n\n");
+      } catch (_) {}
+    }, 20000);
+
+    req.on("close", () => {
+      clearInterval(timer);
+      clearInterval(keepAlive);
+      if (reqDebug) {
+        console.log("[underrpg] /api/events close", { sentTotal, lastAfterMs });
+      }
+    });
+  });
+
+  srv.get("/api/boss/state", async (req, res) => {
+    const baseHp = parseInt(req.query.baseHp, 10);
+    const scale = Number(req.query.scale);
+    const st = await getBossState({ baseHp, scale });
+    if (!st) return res.status(500).json({ ok: false, error: "db" });
+    res.json({ ok: true, state: st });
+  });
+
+  srv.post("/api/boss/hit", express.json(), async (req, res) => {
+    const damage = parseInt(req.body?.damage, 10);
+    const baseHp = parseInt(req.body?.baseHp, 10);
+    const scale = Number(req.body?.scale);
+    const st = await applyBossHit({ damage, baseHp, scale });
+    if (!st) return res.status(500).json({ ok: false, error: "db" });
+    res.json({ ok: true, state: st });
+  });
+
+  srv.post("/api/boss/reset", express.json(), async (req, res) => {
+    const baseHp = parseInt(req.body?.baseHp, 10);
+    const st = await resetBossState({ baseHp });
+    if (!st) return res.status(500).json({ ok: false, error: "db" });
+    res.json({ ok: true, state: st });
   });
 
   srv.get("/comments", async (req, res) => {
@@ -442,6 +627,7 @@ function createObsLauncherFiles() {
   makeLauncher("supers-launcher.html", "http://127.0.0.1:5000/supers");
   makeLauncher("concurrent-launcher.html", "http://127.0.0.1:5000/concurrent");
   makeLauncher("effects-launcher.html", "http://127.0.0.1:5000/effects");
+  makeLauncher("underrpg-launcher.html", "http://127.0.0.1:5000/rpgoverlay");
 
   console.log("📁 OBS launcher files created in:", baseDir);
   return baseDir;

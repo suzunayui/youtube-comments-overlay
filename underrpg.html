@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OBS Icon Rain Overlay</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      #stage {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .icon {
+        position: absolute;
+        border-radius: 999px;
+        overflow: visible;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+        z-index: 9995;
+        will-change: left, bottom, opacity;
+        transition: left 500ms ease-in-out, bottom 500ms ease-in-out;
+      }
+
+      .icon-fall {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        overflow: visible;
+        will-change: transform;
+        transform: translateY(0);
+      }
+
+      .icon-mask {
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .icon.fallback .icon-mask {
+        display: grid;
+        place-items: center;
+        font: 700 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: rgba(255, 255, 255, 0.95);
+        background: rgba(60, 60, 60, 0.9);
+      }
+
+      .chat-bubble {
+        position: fixed;
+        left: 0;
+        top: 0;
+        transform: translate3d(-50%, 8px, 0);
+        opacity: 0;
+        max-width: min(420px, calc(100vw - 40px));
+        padding: 8px 10px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.95);
+        color: #fff;
+        font: 800 32px/1.25 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+        pointer-events: none;
+        white-space: normal;
+        word-break: break-word;
+        line-break: anywhere;
+        z-index: 10010;
+        transition: transform 160ms ease-out, opacity 160ms ease-out;
+      }
+
+      .chat-bubble::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -8px;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid rgba(0, 0, 0, 0.95);
+      }
+
+      .chat-bubble.show {
+        opacity: 1;
+        transform: translate3d(-50%, 0px, 0);
+      }
+
+      .icon-label {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 100%;
+        margin-top: 6px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font: 600 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: rgba(255, 255, 255, 0.95);
+        background: rgba(0, 0, 0, 1);
+        white-space: nowrap;
+      }
+
+      #bossHud {
+        position: fixed;
+        right: 28px;
+        bottom: 28px;
+        width: min(560px, calc(100vw - 32px));
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 16px;
+        align-items: end;
+        z-index: 9998;
+        pointer-events: none;
+      }
+
+      #bossIcon {
+        width: 140px;
+        height: 140px;
+        border-radius: 26px;
+        display: grid;
+        place-items: center;
+        font-size: 92px;
+        background: rgba(0, 0, 0, 1);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+        transform-origin: 60% 80%;
+      }
+
+      #bossPanel {
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(0, 0, 0, 1);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+        color: #fff;
+        font: 15px/1.25 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+
+      #bossName {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        letter-spacing: 0.2px;
+        margin-bottom: 8px;
+      }
+
+      #bossHpBar {
+        width: 100%;
+        height: 18px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+
+      #bossHpFill {
+        height: 100%;
+        width: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #ff5252, #ffb74d);
+        transition: width 180ms linear;
+      }
+
+      #bossHpText {
+        margin-top: 0;
+        opacity: 0.9;
+        font-weight: 700;
+        justify-self: center;
+        white-space: nowrap;
+      }
+
+      #bossHpText strong {
+        font-size: 22px;
+        letter-spacing: 0.2px;
+      }
+
+      #bossLevel {
+        font-size: 22px;
+        letter-spacing: 0.2px;
+      }
+
+      #bossTitle {
+        font-size: 22px;
+        letter-spacing: 0.2px;
+      }
+
+      #bossHpText .hp-now {
+        color: #fff;
+      }
+
+      #bossHpText .hp-max {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      #bossHpText .hp-sep {
+        color: rgba(255, 255, 255, 0.65);
+        padding: 0 6px;
+      }
+
+      #bossHpText .hp-label {
+        display: inline-block;
+        margin-right: 8px;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        opacity: 0.9;
+      }
+
+      .boss-hit {
+        animation: bossHit 140ms ease-out 1;
+      }
+
+      @keyframes bossHit {
+        0% {
+          transform: rotate(0deg) scale(1);
+        }
+        30% {
+          transform: rotate(-4deg) scale(1.03);
+        }
+        70% {
+          transform: rotate(5deg) scale(1.02);
+        }
+        100% {
+          transform: rotate(0deg) scale(1);
+        }
+      }
+
+      .dmg {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        font: 800 18px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #fff;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
+        transform: translate3d(0, 0, 0);
+        will-change: transform, opacity;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage" aria-hidden="true"></div>
+    <div id="bossHud" aria-hidden="true">
+      <div id="bossIcon">👹</div>
+      <div id="bossPanel">
+        <div id="bossName">
+          <span id="bossTitle">BOSS</span>
+          <div id="bossHpText"></div>
+          <span id="bossLevel">Lv.1</span>
+        </div>
+        <div id="bossHpBar"><div id="bossHpFill"></div></div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        const stage = document.getElementById("stage");
+        if (!stage) return;
+
+        const BUILD_ID = "2025.12.17-underrpg-bubble-fixed";
+
+        const qs = new URLSearchParams(location.search);
+        const size = clampInt(qs.get("size"), 8, 256, 64);
+        const gap = clampInt(qs.get("gap"), 0, 80, 10);
+        const rows = clampInt(qs.get("rows"), 1, 10, 1);
+        const colsParam = qs.get("cols") || "auto";
+        const durationMs = clampInt(qs.get("duration"), 100, 10000, 1400);
+        const maxIcons = clampInt(qs.get("max"), 1, 500, 500);
+        const bottom = clampInt(qs.get("bottom"), 0, 400, 12);
+        const left = clampInt(qs.get("left"), 0, 400, 12);
+        const showName = qs.get("name") === "1";
+        const bubbleEnabled = qs.get("bubble") !== "0";
+        const bubbleMs = clampInt(qs.get("bubbleMs"), 200, 20000, 3200);
+        const bubbleMaxLen = clampInt(qs.get("bubbleMaxLen"), 10, 240, 60);
+        // Debug is OFF by default (for OBS/stream); enable with `?debug=1`.
+        const debug = qs.get("debug") === "1";
+
+        const icons = [];
+        const seen = new Map(); // id -> ts(ms)
+        const activeByKey = new Map(); // author/icon -> HTMLElement
+        const commentCountByKey = new Map(); // key -> comment count (session)
+        const bubbleTimerByKey = new Map(); // key -> timeoutId
+        const bubbleElByKey = new Map(); // key -> HTMLElement
+        const bubbleRafByKey = new Map(); // key -> rafId
+        const slotByKey = new Map(); // key -> slotIndex
+        const homeByKey = new Map(); // key -> { leftPx, bottomPx }
+        let nextSlot = 0;
+        let reconnectTimer = null;
+        let receivedCount = 0;
+        let lastEventAt = 0;
+        let spawnedCount = 0;
+        let reusedCount = 0;
+        // "Walk" params (horizontal wandering of the whole icon, clamped to stay on screen)
+        const wanderStep = clampInt(qs.get("wanderStep"), 0, 200, 10); // px per step
+        const wanderMinMs = clampInt(qs.get("wanderMinMs"), 120, 5000, 260);
+        const wanderMaxMs = clampInt(qs.get("wanderMaxMs"), 120, 10000, 650);
+        const wanderDurMinMs = clampInt(qs.get("wanderDurMinMs"), 80, 5000, 220);
+        const wanderDurMaxMs = clampInt(qs.get("wanderDurMaxMs"), 80, 10000, 520);
+        const wanderState = new Map(); // key -> { offset, nextAt, dir }
+        let wanderLoopStarted = false;
+
+        const bossIcon = document.getElementById("bossIcon");
+        const bossHpFill = document.getElementById("bossHpFill");
+        const bossHpText = document.getElementById("bossHpText");
+        const bossLevelEl = document.getElementById("bossLevel");
+        const bossTitleEl = document.getElementById("bossTitle");
+        const attackCooldownMs = clampInt(qs.get("atkCd"), 0, 5000, 450);
+        const dmgMin = clampInt(qs.get("dmgMin"), 1, 999, 1);
+        const dmgMax = clampInt(qs.get("dmgMax"), 1, 999, 5);
+        const powerStep = Math.max(0, Number(qs.get("powerStep") ?? "0.15")) || 0;
+        const powerCap = Math.max(1, Number(qs.get("powerCap") ?? "3")) || 3;
+        const powerLabel = qs.get("powerLabel") === "1";
+        const baseBossHp = clampInt(qs.get("bossHp"), 100, 999999999, 100);
+        const bossScalePerLevel = Number(qs.get("bossScale") ?? "1.1");
+
+        let bossLevel = 1;
+        let bossMaxHp = baseBossHp;
+        let bossHp = bossMaxHp;
+        const atkLastByKey = new Map(); // key -> ts
+        const atkTimersByKey = new Map(); // key -> timeoutId[]
+        const attackingKeys = new Set();
+        const motionByKey = new Map(); // key -> { wanderX, atkX, atkY } (atkY is viewport deltaY)
+        let attackCount = 0;
+        let lastAttack = null;
+
+        // Battle loop: everyone repeatedly runs → hits → knockbacks → re-engages.
+        // Default ON; set `battle=0` to disable.
+        const battleEnabled = qs.get("battle") !== "0";
+        const battleRestMinMs = clampInt(qs.get("battleRestMinMs"), 0, 10000, 180);
+        const battleRestMaxMs = clampInt(qs.get("battleRestMaxMs"), 0, 20000, 520);
+        const battleStartSpreadMs = clampInt(qs.get("battleStartSpreadMs"), 0, 20000, 1200);
+        const battleTimersByKey = new Map(); // key -> timeoutId
+        let battleLoopCount = 0;
+        let lastBattleAt = 0;
+
+        // Optional legacy "raid wave" trigger (OFF by default). Set `raid=1` to enable.
+        const raidEnabled = qs.get("raid") === "1";
+        const raidIntervalMs = clampInt(qs.get("raidIntervalMs"), 200, 10000, 1200);
+        const raidSpreadMs = clampInt(qs.get("raidSpreadMs"), 0, 10000, 700);
+        const raidMaxPerWave = clampInt(qs.get("raidMaxPerWave"), 1, 500, 500);
+        let raidCursor = 0;
+        let raidWaveCount = 0;
+        let lastRaidAt = 0;
+
+        function randInt(min, max) {
+          const a = Math.ceil(min);
+          const b = Math.floor(max);
+          return Math.floor(Math.random() * (b - a + 1)) + a;
+        }
+
+        function fmt(n) {
+          const x = Math.max(0, Math.floor(Number(n) || 0));
+          return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        const bossEmojiOverride = qs.get("bossEmoji");
+        const bossEmojis = [
+          "👹",
+          "👺",
+          "🐲",
+          "🐉",
+          "💀",
+          "👻",
+          "☠️",
+          "🦂",
+          "🕷",
+          "🦇",
+          "🐙",
+          "🦑",
+          "🐍",
+          "🦈",
+          "🦍",
+          "🦁",
+          "🐯",
+          "🐻",
+          "🦊",
+          "🦖",
+          "🦅",
+          "🐗",
+          "🦄",
+          "🔥",
+        ];
+
+        function bossEmojiForLevel(level) {
+          if (typeof bossEmojiOverride === "string" && bossEmojiOverride.trim()) {
+            return bossEmojiOverride.trim();
+          }
+          const lv = Math.max(1, Math.floor(Number(level) || 1));
+          return bossEmojis[(lv - 1) % bossEmojis.length] || "👹";
+        }
+
+        function updateBossHud() {
+          if (!bossHpFill || !bossHpText) return;
+          const pct = bossMaxHp > 0 ? Math.max(0, Math.min(1, bossHp / bossMaxHp)) : 0;
+          bossHpFill.style.width = `${(pct * 100).toFixed(2)}%`;
+          const hpNow = fmt(bossHp);
+          const hpMax = fmt(bossMaxHp);
+          bossHpText.innerHTML =
+            `<span class="hp-label">HP</span>` +
+            `<strong><span class="hp-now">${hpNow}</span>` +
+            `<span class="hp-sep">/</span>` +
+            `<span class="hp-max">${hpMax}</span></strong>`;
+          bossHpText.setAttribute("aria-label", `HP ${hpNow} / ${hpMax}`);
+          if (bossIcon) bossIcon.textContent = bossEmojiForLevel(bossLevel);
+          if (bossLevelEl) bossLevelEl.textContent = `Lv.${bossLevel}`;
+          if (bossTitleEl) bossTitleEl.textContent = "BOSS";
+        }
+        updateBossHud();
+
+        function bossRect() {
+          return bossIcon ? bossIcon.getBoundingClientRect() : null;
+        }
+
+        function applyBossState(st) {
+          if (!st) return;
+          bossLevel = Number(st.level) || bossLevel;
+          bossHp = Number(st.hp);
+          bossMaxHp = Number(st.maxHp);
+          if (!Number.isFinite(bossHp)) bossHp = bossMaxHp;
+          if (!Number.isFinite(bossMaxHp)) bossMaxHp = baseBossHp;
+          updateBossHud();
+        }
+
+        async function initBossState() {
+          try {
+            if (qs.get("bossReset") === "1") {
+              const rr = await fetch("/api/boss/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ baseHp: baseBossHp }),
+              });
+              const rj = await rr.json().catch(() => null);
+              if (rj && rj.ok && rj.state) applyBossState(rj.state);
+            }
+            const url = new URL("/api/boss/state", location.origin);
+            url.searchParams.set("baseHp", String(baseBossHp));
+            url.searchParams.set("scale", String(bossScalePerLevel));
+            const r = await fetch(url.toString(), { cache: "no-store" });
+            const j = await r.json();
+            if (j && j.ok && j.state) applyBossState(j.state);
+          } catch (e) {
+            dbg("boss state init failed", e?.message || e);
+          }
+        }
+
+        async function hitBoss(damage) {
+          if (!Number.isFinite(damage) || damage <= 0) return;
+          try {
+            const r = await fetch("/api/boss/hit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                damage: Math.floor(damage),
+                baseHp: baseBossHp,
+                scale: bossScalePerLevel,
+              }),
+            });
+            const j = await r.json();
+            if (j && j.ok && j.state) {
+              applyBossState(j.state);
+              if (bossIcon) {
+                bossIcon.classList.remove("boss-hit");
+                void bossIcon.offsetHeight;
+                bossIcon.classList.add("boss-hit");
+              }
+            }
+          } catch (e) {
+            // Fallback (no persistence)
+            bossHp = Math.max(0, bossHp - Math.floor(damage));
+            updateBossHud();
+          }
+        }
+
+        function floatDamage(text, x, y, damageValue) {
+          const d = Number.isFinite(damageValue)
+            ? Math.max(1, Math.floor(damageValue))
+            : Math.max(1, Math.floor(Number(String(text).replace(/[^\d]/g, "")) || 1));
+          const fontSize = Math.round(18 + Math.min(30, Math.log10(d) * 15));
+          const el = document.createElement("div");
+          el.className = "dmg";
+          el.textContent = text;
+          el.style.fontSize = `${fontSize}px`;
+          el.style.left = `${Math.round(x)}px`;
+          el.style.top = `${Math.round(y)}px`;
+          document.body.appendChild(el);
+          const dx = randInt(-18, 18);
+          const dy = randInt(-36, -18);
+          requestAnimationFrame(() => {
+            el.style.transition = "transform 650ms ease-out, opacity 650ms ease-out";
+            el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+            el.style.opacity = "0";
+          });
+          setTimeout(() => el.remove(), 700);
+        }
+
+        function debugDot(x, y, label, color = "rgba(0,255,255,0.9)") {
+          if (!debug) return;
+          const d = document.createElement("div");
+          d.style.position = "fixed";
+          d.style.left = `${Math.round(x - 3)}px`;
+          d.style.top = `${Math.round(y - 3)}px`;
+          d.style.width = "6px";
+          d.style.height = "6px";
+          d.style.borderRadius = "999px";
+          d.style.background = color;
+          d.style.boxShadow = `0 0 10px ${color}`;
+          d.style.zIndex = "10000";
+          d.style.pointerEvents = "none";
+          if (label) d.title = label;
+          document.body.appendChild(d);
+          setTimeout(() => d.remove(), 1000);
+        }
+
+        function clearAttackTimers(key) {
+          const arr = atkTimersByKey.get(key);
+          if (arr && Array.isArray(arr)) {
+            for (const t of arr) clearTimeout(t);
+          }
+          atkTimersByKey.delete(key);
+        }
+
+        function clearBattleTimer(key) {
+          const t = battleTimersByKey.get(key);
+          if (typeof t === "number") clearTimeout(t);
+          battleTimersByKey.delete(key);
+        }
+
+        function clearBubbleTimer(key) {
+          const t = bubbleTimerByKey.get(key);
+          if (typeof t === "number") clearTimeout(t);
+          bubbleTimerByKey.delete(key);
+        }
+
+        function clearBubbleRaf(key) {
+          const id = bubbleRafByKey.get(key);
+          if (typeof id === "number") cancelAnimationFrame(id);
+          bubbleRafByKey.delete(key);
+        }
+
+        function normalizeBubbleText(text) {
+          if (typeof text !== "string") return "";
+          const s = text.replace(/\s+/g, " ").trim();
+          if (!s) return "";
+          if (s.length <= bubbleMaxLen) return s;
+          return s.slice(0, Math.max(0, bubbleMaxLen - 1)) + "…";
+        }
+
+        function iconCenterFromState(key) {
+          const home = homeByKey.get(key);
+          if (!home) return null;
+          const m = motionByKey.get(key) || { wanderX: 0, atkX: 0, atkY: 0 };
+          const { h: vh, w: vw } = getViewport();
+          const leftPx = home.leftPx + (m.wanderX || 0) + (m.atkX || 0);
+          const bottomPx = home.bottomPx - (m.atkY || 0);
+          const topPx = vh - bottomPx - size;
+          const cx = leftPx + size / 2;
+          const cy = topPx + size / 2;
+          if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+          return { cx, cy, vw, vh };
+        }
+
+        function positionBubble(key) {
+          const el = bubbleElByKey.get(key);
+          if (!el || !el.isConnected) return;
+          const p = iconCenterFromState(key);
+          if (!p) return;
+          const pad = 12;
+          const x = Math.max(pad, Math.min(p.vw - pad, p.cx));
+          const y = Math.max(pad, Math.min(p.vh - pad, p.cy - size / 2 - 20));
+          el.style.left = `${Math.round(x)}px`;
+          el.style.top = `${Math.round(y)}px`;
+        }
+
+        function showBubble(key, _fall, text) {
+          if (!bubbleEnabled) return;
+          if (!key) return;
+          const t = normalizeBubbleText(text);
+          if (!t) return;
+
+          let el = bubbleElByKey.get(key);
+          if (!el || !el.isConnected) {
+            el = document.createElement("div");
+            el.className = "chat-bubble";
+            document.body.appendChild(el);
+            bubbleElByKey.set(key, el);
+          }
+          el.textContent = t;
+          el.classList.remove("show");
+          void el.offsetHeight;
+          el.classList.add("show");
+          positionBubble(key);
+
+          clearBubbleTimer(key);
+          clearBubbleRaf(key);
+          const tick = () => {
+            positionBubble(key);
+            const raf = requestAnimationFrame(tick);
+            bubbleRafByKey.set(key, raf);
+          };
+          const raf = requestAnimationFrame(tick);
+          bubbleRafByKey.set(key, raf);
+
+          const timeout = window.setTimeout(() => {
+            bubbleTimerByKey.delete(key);
+            clearBubbleRaf(key);
+            const cur = bubbleElByKey.get(key);
+            if (cur && cur.isConnected) cur.classList.remove("show");
+          }, bubbleMs);
+          bubbleTimerByKey.set(key, timeout);
+        }
+
+        function tryAttack(key, el) {
+          if (!key || !el || !el.isConnected) return false;
+          if (attackingKeys.has(key)) return false;
+          const now = Date.now();
+          const last = atkLastByKey.get(key) || 0;
+          if (attackCooldownMs > 0 && now - last < attackCooldownMs) return false;
+          atkLastByKey.set(key, now);
+          meleeAttack(el, key);
+          return true;
+        }
+
+        function scheduleBattleNext(key, minMs = battleRestMinMs, maxMs = battleRestMaxMs) {
+          if (!battleEnabled) return;
+          clearBattleTimer(key);
+          const lo = Math.max(0, minMs);
+          const hi = Math.max(lo, maxMs);
+          const delay = lo === hi ? lo : randInt(lo, hi);
+          const t = window.setTimeout(() => {
+            battleTimersByKey.delete(key);
+            const el = activeByKey.get(key);
+            if (!el) return;
+            if (!tryAttack(key, el)) {
+              scheduleBattleNext(key, 120, 260);
+            }
+          }, delay);
+          battleTimersByKey.set(key, t);
+          lastBattleAt = Date.now();
+        }
+
+        function ensureBattleLoopForKey(key) {
+          if (!battleEnabled) return;
+          if (!key || battleTimersByKey.has(key)) return;
+          const delay = battleStartSpreadMs > 0 ? randInt(0, battleStartSpreadMs) : 0;
+          const t = window.setTimeout(() => {
+            battleTimersByKey.delete(key);
+            battleLoopCount += 1;
+            scheduleBattleNext(key, 0, 0);
+          }, delay);
+          battleTimersByKey.set(key, t);
+        }
+
+        function runRaidWave() {
+          if (!raidEnabled) return;
+          const keys = Array.from(activeByKey.keys());
+          if (keys.length === 0) return;
+
+          const take = Math.min(keys.length, raidMaxPerWave);
+          const waveKeys = [];
+          for (let i = 0; i < take; i++) {
+            waveKeys.push(keys[(raidCursor + i) % keys.length]);
+          }
+          raidCursor = (raidCursor + take) % keys.length;
+
+          const spread = Math.max(0, raidSpreadMs);
+          raidWaveCount += 1;
+          lastRaidAt = Date.now();
+
+          for (const key of waveKeys) {
+            const el = activeByKey.get(key);
+            const delay = spread > 0 ? randInt(0, spread) : 0;
+            setTimeout(() => {
+              tryAttack(key, el);
+            }, delay);
+          }
+        }
+
+        if (raidEnabled) {
+          setInterval(runRaidWave, raidIntervalMs);
+          // Start quickly so it feels alive even without new comments.
+          setTimeout(runRaidWave, 400);
+        }
+        if (battleEnabled) {
+          // Start quickly so it feels alive even without new comments.
+          setTimeout(() => {
+            for (const key of activeByKey.keys()) ensureBattleLoopForKey(key);
+          }, 300);
+        }
+
+        function applyMotion(key, el, transition) {
+          if (!el) return;
+          const m = motionByKey.get(key) || { wanderX: 0, atkX: 0, atkY: 0 };
+          motionByKey.set(key, m);
+          if (typeof transition === "string") el.style.transition = transition;
+          const home = homeByKey.get(key);
+          if (!home) return;
+          const x = Math.round((m.wanderX || 0) + (m.atkX || 0));
+          const y = Math.round(m.atkY || 0);
+          el.style.left = `${Math.round(home.leftPx + x)}px`;
+          // bottom is inverted vs viewport y: moving down (+y) means bottom decreases.
+          el.style.bottom = `${Math.round(home.bottomPx - y)}px`;
+        }
+
+        function ensureHomeForKey(key, el) {
+          if (!key || !el || homeByKey.has(key)) return;
+          const leftPx = el.offsetLeft;
+          let bottomPx = parseFloat(el.style.bottom);
+          if (!Number.isFinite(bottomPx)) {
+            const stageH = stage.clientHeight || 0;
+            const topPx = el.offsetTop;
+            if (stageH > 0 && Number.isFinite(topPx)) {
+              bottomPx = stageH - size - topPx;
+            }
+          }
+          if (Number.isFinite(leftPx) && Number.isFinite(bottomPx)) {
+            homeByKey.set(key, { leftPx, bottomPx });
+          }
+        }
+
+        function meleeAttack(fromEl, key) {
+          const br = bossRect();
+          if (!br) return;
+          ensureHomeForKey(key, fromEl);
+          const { h: vh } = getViewport();
+          const vw = window.innerWidth || document.documentElement.clientWidth || stage.clientWidth || 0;
+          const home = homeByKey.get(key);
+          const m0 = motionByKey.get(key) || { wanderX: 0, atkX: 0, atkY: 0 };
+          // Compute attacker center without relying on getBoundingClientRect (OBS can be quirky).
+          const curLeft = (home?.leftPx || 0) + (m0.wanderX || 0) + (m0.atkX || 0);
+          const curBottom = (home?.bottomPx || 0) - (m0.atkY || 0);
+          const sx = curLeft + size / 2;
+          const sy = vh - curBottom - size / 2;
+          const bx = br.left + br.width / 2;
+          const by = br.top + br.height / 2;
+
+          debugDot(sx, sy, "attacker", "rgba(0,255,255,0.9)");
+          debugDot(bx, by, "boss", "rgba(255,0,255,0.9)");
+
+          // Always aim for the LEFT side of the boss so players don't end up on the right side.
+          const iconR = Math.max(10, Math.min(80, size / 2));
+          const bossLeftX = br.left - iconR - 14;
+          const targetX = Math.min(bossLeftX, vw - left - size);
+
+          // Spread targets vertically to reduce stacking/overlap near the boss.
+          const slot = slotByKey.get(key);
+          const slotIndex = Number.isFinite(slot) ? slot : 0;
+          const laneSpacing = Math.max(10, Math.floor(size * 0.75));
+          const laneCount = Math.max(
+            1,
+            Math.min(36, Math.floor(Math.max(1, br.height - size) / laneSpacing) + 1)
+          );
+          const lane = laneCount <= 1 ? 0 : slotIndex % laneCount;
+          const laneTop = br.top + size * 0.35;
+          const laneBottom = br.top + br.height - size * 0.35;
+          const laneSpan = Math.max(1, laneBottom - laneTop);
+          const laneY =
+            laneCount <= 1
+              ? br.top + br.height * 0.55
+              : laneTop + (lane / (laneCount - 1)) * laneSpan;
+          const targetY = Math.max(0, Math.min(vh - size, laneY + randInt(-10, 10)));
+
+          const dx0 = targetX - sx;
+          const dy0 = targetY - sy;
+          const dist0 = Math.hypot(dx0, dy0) || 1;
+          const ux = dx0 / dist0;
+          const uy = dy0 / dist0;
+
+          // Move directly to our chosen target point (already left of the boss).
+          const tx = dx0;
+          const ty = dy0;
+
+          clearAttackTimers(key);
+
+          const runMs = Math.max(200, Math.min(820, dist0 * 0.85));
+          const knockMs = 180;
+          const backMs = 420;
+          const knockDist = Math.max(18, Math.min(90, Math.round(iconR * 1.1)));
+          const kx = tx - ux * knockDist;
+          const ky = ty - uy * knockDist;
+
+          const baseDamage = randInt(Math.min(dmgMin, dmgMax), Math.max(dmgMin, dmgMax));
+          const count = commentCountByKey.get(key) || 1;
+          const mult = Math.min(powerCap, 1 + Math.max(0, count - 1) * powerStep);
+          const damage = Math.max(1, Math.floor(baseDamage * mult));
+
+          attackCount += 1;
+          lastAttack = {
+            key,
+            tx: Math.round(tx),
+            ty: Math.round(ty),
+            dist: Math.round(dist0),
+            damage,
+            baseDamage,
+            mult: Number(mult.toFixed(2)),
+            count,
+          };
+          dbg("attack", {
+            key,
+            tx: Math.round(tx),
+            ty: Math.round(ty),
+            dist: Math.round(dist0),
+            targetX: Math.round(targetX),
+            targetY: Math.round(targetY),
+            damage,
+            baseDamage,
+            mult: Number(mult.toFixed(2)),
+            count,
+          });
+
+          // Run toward the boss.
+          attackingKeys.add(key);
+          fromEl.style.zIndex = "9996";
+          const m = motionByKey.get(key) || { wanderX: 0, atkX: 0, atkY: 0 };
+          motionByKey.set(key, m);
+          m.atkX = tx;
+          m.atkY = ty;
+          applyMotion(
+            key,
+            fromEl,
+            `left ${runMs}ms cubic-bezier(0.2, 0.8, 0.2, 1), bottom ${runMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)`
+          );
+          if (debug) {
+            dbg("applyMotion(run)", {
+              key,
+              home: homeByKey.get(key),
+              left: fromEl.style.left,
+              bottom: fromEl.style.bottom,
+            });
+          }
+
+          const t1 = setTimeout(() => {
+            // Hit + knockback.
+            hitBoss(damage);
+            floatDamage(`-${damage}`, bx + randInt(-14, 14), by + randInt(-14, 14), damage);
+
+            const mm = motionByKey.get(key);
+            if (mm) {
+              mm.atkX = kx;
+              mm.atkY = ky;
+            }
+            applyMotion(key, fromEl, `left ${knockMs}ms ease-out, bottom ${knockMs}ms ease-out`);
+          }, runMs);
+
+          const t2 = setTimeout(() => {
+            // Return to your own slot (prevents overlap buildup).
+            const mm = motionByKey.get(key);
+            if (mm) {
+              mm.atkX = 0;
+              mm.atkY = 0;
+            }
+            applyMotion(
+              key,
+              fromEl,
+              `left ${backMs}ms cubic-bezier(0.2, 0.8, 0.2, 1), bottom ${backMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)`
+            );
+          }, runMs + knockMs);
+
+          const t3 = setTimeout(() => {
+            attackingKeys.delete(key);
+            fromEl.style.zIndex = "";
+            scheduleBattleNext(key, battleRestMinMs, battleRestMaxMs);
+          }, runMs + knockMs + backMs + 20);
+
+          atkTimersByKey.set(key, [t1, t2, t3]);
+        }
+
+        const debugBox = (() => {
+          if (!debug) return null;
+          const el = document.createElement("div");
+          el.style.position = "fixed";
+          el.style.left = "8px";
+          el.style.top = "8px";
+          el.style.padding = "8px 10px";
+          el.style.borderRadius = "8px";
+          el.style.background = "rgba(0,0,0,0.65)";
+          el.style.color = "#fff";
+          el.style.font = "12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+          el.style.zIndex = "9999";
+          el.style.pointerEvents = "none";
+          el.textContent = "underrpg debug: init";
+          document.body.appendChild(el);
+          return el;
+        })();
+
+        function getViewport() {
+          const w =
+            window.innerWidth ||
+            document.documentElement.clientWidth ||
+            stage.clientWidth ||
+            0;
+          const h =
+            window.innerHeight ||
+            document.documentElement.clientHeight ||
+            stage.clientHeight ||
+            0;
+          return { w, h };
+        }
+
+        function setDebug(text) {
+          if (!debugBox) return;
+          debugBox.textContent = text;
+        }
+
+        function dbg(...args) {
+          if (!debug) return;
+          console.log("[underrpg]", ...args);
+        }
+
+        function clampInt(v, min, max, def) {
+          if (v == null || v === "") return def;
+          const n = Number(v);
+          if (!Number.isFinite(n)) return def;
+          return Math.max(min, Math.min(max, Math.trunc(n)));
+        }
+
+        function computeCols() {
+          const { w } = getViewport();
+          const usable = Math.max(1, w - left * 2);
+          const auto = Math.max(1, Math.floor((usable + gap) / (size + gap)));
+          if (colsParam === "auto") return auto;
+          const fixed = clampInt(colsParam, 1, 200, auto);
+          return Math.min(fixed, auto);
+        }
+
+        function slotPos(slotIndex) {
+          const cols = computeCols();
+          const c = slotIndex % cols;
+          const r = Math.floor(slotIndex / cols);
+          return {
+            leftPx: left + c * (size + gap),
+            bottomPx: bottom + r * (size + gap),
+          };
+        }
+
+        function ensureWanderLoop() {
+          if (wanderLoopStarted || wanderStep <= 0) return;
+          wanderLoopStarted = true;
+          setInterval(() => {
+            const now = Date.now();
+            const stageW = stage.clientWidth || 0;
+            if (stageW <= 0) return;
+
+            for (const [key, el] of activeByKey) {
+              if (!el || !el.isConnected) {
+                wanderState.delete(key);
+                continue;
+              }
+              if (attackingKeys.has(key)) continue;
+              let st = wanderState.get(key);
+              if (!st) {
+                st = { offset: 0, nextAt: 0, dir: Math.random() < 0.5 ? -1 : 1 };
+                wanderState.set(key, st);
+              }
+              if (now < st.nextAt) continue;
+
+              // Keep within left/right margins.
+              const home = homeByKey.get(key);
+              if (!home) continue;
+              const baseLeft = home.leftPx;
+              const minOff = left - baseLeft;
+              const maxOff = stageW - left - size - baseLeft;
+              const clamp = (v) => Math.max(minOff, Math.min(maxOff, v));
+
+              if (Math.random() < 0.12) st.dir *= -1; // occasionally turn around
+              const stride = randInt(Math.max(2, Math.floor(wanderStep / 3)), Math.max(2, wanderStep));
+              // Avoid overlapping neighbors: keep wander within ~half the gap.
+              const maxWander = Math.max(0, Math.floor(gap / 2) - 1);
+              const next = clamp(
+                Math.max(-maxWander, Math.min(maxWander, st.offset + st.dir * stride))
+              );
+              st.offset = next;
+              st.nextAt = now + randInt(wanderMinMs, Math.max(wanderMinMs, wanderMaxMs));
+
+              const mm = motionByKey.get(key) || { wanderX: 0, atkX: 0, atkY: 0 };
+              motionByKey.set(key, mm);
+              mm.wanderX = next;
+              const dur = randInt(wanderDurMinMs, Math.max(wanderDurMinMs, wanderDurMaxMs));
+              applyMotion(key, el, `left ${dur}ms ease-in-out, bottom ${dur}ms ease-in-out`);
+            }
+          }, 120);
+        }
+
+        function pruneSeen() {
+          const now = Date.now();
+          for (const [id, ts] of seen) {
+            if (now - ts > 5 * 60 * 1000) seen.delete(id);
+          }
+          if (seen.size > 2000) {
+            const ids = [...seen.keys()].slice(0, seen.size - 1500);
+            for (const id of ids) seen.delete(id);
+          }
+        }
+
+        function removeOldestIfNeeded() {
+          while (icons.length > maxIcons) {
+            const el = icons.shift();
+            if (!el) continue;
+            const key = el.dataset && el.dataset.key;
+            if (key && activeByKey.get(key) === el) {
+              activeByKey.delete(key);
+              commentCountByKey.delete(key);
+              clearBubbleTimer(key);
+              clearBubbleRaf(key);
+              const b = bubbleElByKey.get(key);
+              if (b && b.isConnected) b.remove();
+              bubbleElByKey.delete(key);
+              slotByKey.delete(key);
+              homeByKey.delete(key);
+              wanderState.delete(key);
+              motionByKey.delete(key);
+              clearAttackTimers(key);
+              clearBattleTimer(key);
+              attackingKeys.delete(key);
+            }
+            el.style.transition = "opacity 250ms linear";
+            el.style.opacity = "0";
+            setTimeout(() => el.remove(), 260);
+          }
+        }
+
+        function spawn({ id, icon, author, text, showBubble: showBubbleFlag = true }) {
+          if (!icon && author == null) return;
+
+          spawnedCount += 1;
+          if (id) {
+            pruneSeen();
+            if (seen.has(id)) return;
+            seen.set(id, Date.now());
+          }
+
+          function normalizeIconUrl(url) {
+            if (typeof url !== "string") return null;
+            const s = url.trim();
+            if (!s) return null;
+            if (s.startsWith("//")) return "https:" + s;
+            if (s.startsWith("http://")) return "https://" + s.slice("http://".length);
+            return s;
+          }
+
+          const key =
+            (typeof author === "string" && author.trim()) ||
+            normalizeIconUrl(icon) ||
+            null;
+          if (!key) return;
+
+          const existing = activeByKey.get(key);
+          const nextCommentCount = (commentCountByKey.get(key) || 0) + 1;
+          commentCountByKey.set(key, nextCommentCount);
+
+          const el = existing || document.createElement("div");
+          if (!existing) {
+            el.className = "icon";
+            el.dataset.key = key;
+            el.style.opacity = "1";
+          } else {
+            reusedCount += 1;
+            ensureHomeForKey(key, el);
+          }
+
+          el.style.width = `${size}px`;
+          el.style.height = `${size}px`;
+
+          // If an older build created .icon-move, unwrap it (so the whole icon moves).
+          const legacyMove = el.querySelector(":scope > .icon-move");
+          if (legacyMove) {
+            const nodes = Array.from(legacyMove.childNodes);
+            el.textContent = "";
+            for (const n of nodes) el.appendChild(n);
+          }
+
+          // Fall animation runs on an inner wrapper (so we can animate drop without affecting X/Y).
+          let fall = el.querySelector(":scope > .icon-fall");
+          if (!fall) {
+            const prev = Array.from(el.childNodes);
+            fall = document.createElement("div");
+            fall.className = "icon-fall";
+            el.textContent = "";
+            el.appendChild(fall);
+            for (const n of prev) fall.appendChild(n);
+          }
+
+          // Mask for the icon (so we can keep .icon overflow visible for labels/bubbles).
+          let mask = fall.querySelector(":scope > .icon-mask");
+          if (!mask) {
+            const prev = Array.from(fall.childNodes).filter(
+              (n) => !(n.nodeType === 1 && (n.classList?.contains("icon-label") || n.classList?.contains("icon-bubble")))
+            );
+            mask = document.createElement("div");
+            mask.className = "icon-mask";
+            // Keep existing label/bubble nodes in place, put visual nodes into the mask.
+            for (const n of prev) fall.removeChild(n);
+            fall.insertBefore(mask, fall.firstChild);
+            for (const n of prev) mask.appendChild(n);
+          }
+
+          // Update content (image / fallback / label)
+          const iconUrl = normalizeIconUrl(icon);
+          const hasImg = !!mask.querySelector("img");
+          const labelEl = fall.querySelector(".icon-label");
+          if (iconUrl) {
+            let img = mask.querySelector("img");
+            if (!img) {
+              el.classList.remove("fallback");
+              img = document.createElement("img");
+              img.alt = author || "";
+              img.onerror = () => {
+                el.classList.add("fallback");
+                mask.textContent = (author || "?").slice(0, 1);
+                dbg("img error (fallback)", { id, icon, author, src: img.src });
+              };
+              mask.textContent = "";
+              mask.appendChild(img);
+            }
+            img.alt = author || "";
+            img.src = iconUrl;
+          } else {
+            // Fallback initial
+            if (hasImg) {
+              mask.textContent = "";
+            }
+            el.classList.add("fallback");
+            mask.textContent = (author || "?").slice(0, 1);
+          }
+
+          if (showName && author) {
+            if (!labelEl) {
+              const label = document.createElement("div");
+              label.className = "icon-label";
+              label.textContent =
+                powerLabel && nextCommentCount > 1 ? `${author} ×${nextCommentCount}` : author;
+              fall.appendChild(label);
+            } else {
+              labelEl.textContent =
+                powerLabel && nextCommentCount > 1 ? `${author} ×${nextCommentCount}` : author;
+            }
+          } else if (labelEl) {
+            labelEl.remove();
+          }
+
+          if (!existing) {
+            const slot = nextSlot++;
+            slotByKey.set(key, slot);
+            motionByKey.set(key, { wanderX: 0, atkX: 0, atkY: 0 });
+            const pos = slotPos(slot);
+            homeByKey.set(key, { leftPx: pos.leftPx, bottomPx: pos.bottomPx });
+            applyMotion(key, el, "left 500ms ease-in-out, bottom 500ms ease-in-out");
+            stage.appendChild(el);
+            icons.push(el);
+            activeByKey.set(key, el);
+            removeOldestIfNeeded();
+
+            // Fall animation is ONLY for newly-added users.
+            const { h } = getViewport();
+            const travel = h + size + 40;
+            fall.style.transition = "none";
+            fall.style.transform = `translateY(-${travel}px)`;
+            // Force reflow before starting transition.
+            void fall.offsetHeight;
+            fall.style.transition = `transform ${durationMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)`;
+            requestAnimationFrame(() => {
+              fall.style.transform = "translateY(0px)";
+            });
+          } else {
+            // Don't move existing users when new users arrive.
+            // Keep their original left/bottom to avoid "warp".
+            if (!homeByKey.has(key)) {
+              const curLeft = parseFloat(el.style.left);
+              const curBottom = parseFloat(el.style.bottom);
+              if (Number.isFinite(curLeft) && Number.isFinite(curBottom)) {
+                homeByKey.set(key, { leftPx: curLeft, bottomPx: curBottom });
+              }
+            }
+            // Keep them in place (no re-fall animation).
+            fall.style.transition = "none";
+            fall.style.transform = "translateY(0px)";
+          }
+
+          if (showBubbleFlag) {
+            showBubble(key, fall, text);
+          }
+
+          if (spawnedCount <= 3) {
+            dbg("spawn", { id, icon, author, travel, viewport: getViewport() });
+          }
+
+          ensureWanderLoop();
+          ensureBattleLoopForKey(key);
+
+          return { el, key };
+        }
+
+        function connectSse() {
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+
+        const es = new EventSource("/api/events");
+          es.onopen = () => {
+            dbg("sse open");
+            setDebug("underrpg debug: sse=open");
+          };
+          es.onmessage = (ev) => {
+            try {
+              const msg = JSON.parse(ev.data);
+              const ref = spawn({ id: msg.id, icon: msg.icon, author: msg.author, text: msg.text });
+              receivedCount += 1;
+              lastEventAt = Date.now();
+              if (receivedCount % 10 === 0) {
+                setDebug(
+                  `underrpg debug: sse=open received=${receivedCount} lastId=${String(msg.id || "").slice(0, 24)}`
+                );
+              }
+              if (receivedCount <= 3) dbg("event", msg);
+            } catch (_) {}
+          };
+          es.onerror = () => {
+            dbg("sse error; retry in 2s");
+            setDebug(
+              `underrpg debug: sse=error received=${receivedCount} lastEvent=${lastEventAt ? ((Date.now() - lastEventAt) / 1000).toFixed(1) + "s ago" : "never"}`
+            );
+            try {
+              es.close();
+            } catch (_) {}
+            reconnectTimer = setTimeout(connectSse, 2000);
+          };
+        }
+
+        fetch(`/api/recent?limit=${Math.min(20, maxIcons)}`)
+          .then((r) => (r.ok ? r.json() : []))
+          .then((rows) => {
+            if (!Array.isArray(rows)) return;
+            dbg("recent", { count: rows.length, sample: rows[rows.length - 1] });
+            setDebug(`underrpg debug: recent=${rows.length} connecting sse...`);
+            for (const msg of rows) {
+              spawn({ id: msg.id, icon: msg.icon, author: msg.author, text: msg.text, showBubble: false });
+            }
+          })
+          .catch(() => {});
+
+        initBossState();
+        connectSse();
+
+        setInterval(() => {
+          if (!debug) return;
+          const { w, h } = getViewport();
+          const age =
+            lastEventAt > 0 ? ((Date.now() - lastEventAt) / 1000).toFixed(1) + "s" : "never";
+          const lastAtk =
+            lastAttack && lastAttack.key
+              ? ` atk=${attackCount} last=${String(lastAttack.key).slice(0, 10)}(${lastAttack.tx},${lastAttack.ty}) dmg=${lastAttack.damage ?? "?"} x${lastAttack.mult ?? "?"} c=${lastAttack.count ?? "?"}`
+              : ` atk=${attackCount} last=none`;
+          const raidAge =
+            raidEnabled && lastRaidAt > 0 ? ((Date.now() - lastRaidAt) / 1000).toFixed(1) + "s" : "never";
+          const raidInfo = raidEnabled
+            ? ` raid=on wave=${raidWaveCount} lastRaid=${raidAge}`
+            : " raid=off";
+          const battleAge =
+            battleEnabled && lastBattleAt > 0 ? ((Date.now() - lastBattleAt) / 1000).toFixed(1) + "s" : "never";
+          const battleInfo = battleEnabled
+            ? ` battle=on loops=${battleLoopCount} lastBattle=${battleAge}`
+            : " battle=off";
+          setDebug(
+            `underrpg ${BUILD_ID}: ${w}x${h} received=${receivedCount} spawned=${spawnedCount} reused=${reusedCount} dom=${stage.childElementCount} unique=${activeByKey.size}${lastAtk}${battleInfo}${raidInfo} lastEvent=${age}`
+          );
+        }, 1000);
+      })();
+    </script>
+  </body>
+</html>
