@@ -34,6 +34,26 @@ function ensureIconColumn() {
   }
 }
 
+function ensureBadgeColumns() {
+  try {
+    const rows = db.prepare("PRAGMA table_info(comments)").all();
+    const hasMember = rows.some((r) => r.name === "is_member");
+    const hasModerator = rows.some((r) => r.name === "is_moderator");
+    const hasOwner = rows.some((r) => r.name === "is_owner");
+    if (!hasMember) {
+      db.prepare("ALTER TABLE comments ADD COLUMN is_member INTEGER").run();
+    }
+    if (!hasModerator) {
+      db.prepare("ALTER TABLE comments ADD COLUMN is_moderator INTEGER").run();
+    }
+    if (!hasOwner) {
+      db.prepare("ALTER TABLE comments ADD COLUMN is_owner INTEGER").run();
+    }
+  } catch (err) {
+    console.warn("ensureBadgeColumns error:", err.message || err);
+  }
+}
+
 function ensureBossStateTable() {
   try {
     if (!db) return;
@@ -75,17 +95,21 @@ function initChatStore(baseDir) {
       amount_text TEXT,
       icon TEXT,
       parts_json TEXT,
-      colors_json TEXT
+      colors_json TEXT,
+      is_member INTEGER,
+      is_moderator INTEGER,
+      is_owner INTEGER
     )`
   );
 
   ensureIconColumn();
   ensureColorsColumn();
+  ensureBadgeColumns();
   ensureBossStateTable();
   insertStmt = db.prepare(
     `INSERT OR IGNORE INTO comments
-     (id, video_id, timestamp_ms, timestamp, author, text, kind, amount, amount_text, icon, parts_json, colors_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     (id, video_id, timestamp_ms, timestamp, author, text, kind, amount, amount_text, icon, parts_json, colors_json, is_member, is_moderator, is_owner)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   return dbPath;
@@ -267,7 +291,10 @@ function saveComment(msg) {
       msg.amount_text || null,
       msg.icon || null,
       partsJson,
-      colorsJson
+      colorsJson,
+      msg.is_member ? 1 : 0,
+      msg.is_moderator ? 1 : 0,
+      msg.is_owner ? 1 : 0
     );
   } catch (err) {
     console.warn("saveComment sqlite error:", err.message || err);
@@ -282,7 +309,7 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
     }
     try {
       const lim = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : DEFAULT_LIMIT;
-      const sql = `SELECT id, video_id, timestamp_ms, timestamp, author, text, kind, amount, amount_text, icon, parts_json, colors_json
+      const sql = `SELECT id, video_id, timestamp_ms, timestamp, author, text, kind, amount, amount_text, icon, parts_json, colors_json, is_member, is_moderator, is_owner
                    FROM comments
                    ORDER BY timestamp_ms DESC, rowid DESC
                    LIMIT ?`;
@@ -313,6 +340,9 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
           icon: r.icon,
           colors,
           parts,
+          is_member: r.is_member === 1,
+          is_moderator: r.is_moderator === 1,
+          is_owner: r.is_owner === 1,
         };
       });
       resolve(result);

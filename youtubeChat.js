@@ -308,6 +308,55 @@ function extractAuthorPhoto(renderer, msgType) {
   return null;
 }
 
+function extractAuthorBadges(renderer) {
+  const badges = renderer.authorBadges || [];
+  let isMember = false;
+  let isModerator = false;
+  let isOwner = false;
+  for (const b of badges) {
+    const r = b && b.liveChatAuthorBadgeRenderer;
+    if (!r) continue;
+    const iconType = r.icon && r.icon.iconType;
+    const iconStr = String(iconType || "").toUpperCase();
+    const tooltipRaw = r.tooltip || "";
+    const tooltip = tooltipRaw.toLowerCase();
+    const label =
+      (r.accessibility &&
+        r.accessibility.accessibilityData &&
+        r.accessibility.accessibilityData.label) ||
+      "";
+    const labelLower = label.toLowerCase();
+    const textLower = `${tooltip} ${labelLower}`;
+    const textRaw = `${tooltipRaw} ${label}`;
+
+    if (
+      iconStr.includes("OWNER") ||
+      textLower.includes("owner") ||
+      textRaw.includes("所有者") ||
+      textRaw.includes("配信者")
+    ) {
+      isOwner = true;
+    }
+    if (
+      iconStr.includes("MODERATOR") ||
+      textLower.includes("moderator") ||
+      textRaw.includes("モデレーター") ||
+      textRaw.includes("管理者")
+    ) {
+      isModerator = true;
+    }
+    if (
+      iconStr.includes("MEMBER") ||
+      textLower.includes("member") ||
+      textRaw.includes("メンバー") ||
+      textRaw.includes("スポンサー")
+    ) {
+      isMember = true;
+    }
+  }
+  return { isMember, isModerator, isOwner };
+}
+
 /**
  * 日付フォーマット: YYYY-MM-DD HH:MM:SS
  */
@@ -511,6 +560,8 @@ async function fetchChatOnce(apiKey, clientVersion, continuation) {
 
     // アイコンURL
     const iconUrl = extractAuthorPhoto(renderer, msgType);
+    const badgeInfo = extractAuthorBadges(renderer);
+    const isMember = badgeInfo.isMember || msgType === "membership";
 
     // YouTube が返す一意な ID があればそれを使う。なければ従来の生成ルール。
     const rawId =
@@ -532,6 +583,9 @@ async function fetchChatOnce(apiKey, clientVersion, continuation) {
       kind: msgType,        // "text", "paid", "sticker", "membership", "gift_purchase", "gift_redeem"
       amount: amountValue,  // int or null
       amount_text: amountText,
+      is_member: isMember,
+      is_moderator: badgeInfo.isModerator,
+      is_owner: badgeInfo.isOwner,
     });
   }
 

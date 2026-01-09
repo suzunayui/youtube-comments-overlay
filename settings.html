@@ -273,6 +273,239 @@
     font-size: 11px;
     color: #cdd0ff;
   }
+
+  .tab-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 0;
+    background: #1a1a2a;
+    padding: 6px;
+    border-radius: 8px;
+  }
+
+  .tab-btn {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: #2a2a3d;
+    color: #f5f5f5;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .tab-btn.active {
+    background: #3f51b5;
+    border-color: #5a6cff;
+  }
+
+  .right-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .tab-column {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .tab-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .viewer-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  #viewerPanel {
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    align-self: flex-start;
+  }
+
+  .viewer-card {
+    flex: 1;
+    min-width: 0;
+    background: #1f1f32;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .viewer-card h2 {
+    font-size: 14px;
+    margin: 0;
+    border-bottom: 1px solid #3a3a4f;
+    padding-bottom: 6px;
+  }
+
+  .viewer-controls {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .viewer-controls input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3d;
+    color: #f5f5f5;
+    font-size: 11px;
+  }
+
+  .viewer-controls label {
+    margin: 0;
+    font-size: 11px;
+  }
+
+  .viewer-controls button {
+    padding: 4px 6px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: #3f51b5;
+    color: #fff;
+  }
+
+  .viewer-controls button.secondary {
+    background: #5a5a6e;
+  }
+
+  .list-box {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: #0b0b0f;
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .list-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+  }
+
+  .list-item.new {
+    background: rgba(255, 211, 64, 0.25);
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px rgba(255, 211, 64, 0.6);
+    animation: blinkNew 1s steps(1, end) infinite;
+  }
+
+  .list-item.unread {
+    background: #1a1a26;
+    border-radius: 8px;
+  }
+
+  .chat-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #2b2b3a;
+    flex: 0 0 auto;
+  }
+
+  .chat-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .chat-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-header {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin-bottom: 1px;
+  }
+
+  .chat-time {
+    color: #9a9a9a;
+    font-size: 12px;
+    min-width: 56px;
+  }
+
+  .item-author {
+    font-weight: 700;
+    font-size: 13px;
+    color: #f5f5f5;
+  }
+
+  .item-author.member {
+    color: #39d264;
+  }
+
+  .item-author.moderator {
+    color: #4da3ff;
+  }
+
+  .item-text {
+    font-size: 13px;
+    word-break: break-word;
+    color: #f5f5f5;
+    line-height: 1.25;
+  }
+
+  .item-text img.emoji {
+    height: 1.4em;
+    vertical-align: middle;
+  }
+
+  .item-text img.sticker {
+    height: 32px;
+    vertical-align: middle;
+  }
+
+  .item-badge {
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: #2a2a44;
+    color: #cfd3ff;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  @keyframes blinkNew {
+    0%, 100% { background: rgba(255, 211, 64, 0.35); box-shadow: 0 0 0 1px rgba(255, 211, 64, 0.6); }
+    50% { background: transparent; box-shadow: none; }
+  }
 </style>
 </head>
 <body>
@@ -292,18 +525,38 @@
 
     <div id="status">ステータス: 停止中</div>
 
-    <div id="launchersBox">
-      <div id="launchersPath">OBS 用ランチャーフォルダ: 準備中…</div>
-      <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
-      <div class="small">
-        フォルダ内の <code>*.html</code> を OBS にドラッグ＆ドロップ
+    <div class="tab-column">
+      <div id="launchersBox">
+        <div id="launchersPath">OBS 用ランチャーフォルダ: 準備中…</div>
+        <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
+        <div class="small">
+          フォルダ内の <code>*.html</code> を OBS にドラッグ＆ドロップ
+        </div>
+      </div>
+
+      <div class="tab-bar" id="mainTabs">
+        <button class="tab-btn active" data-tab="settings">設定</button>
+        <button class="tab-btn" data-tab="viewer">コメント閲覧</button>
+      </div>
+
+      <div class="tab-bar" id="viewerTabs">
+        <button class="tab-btn active" data-tab="comments">コメント</button>
+        <button class="tab-btn" data-tab="supers">スパチャ読み</button>
+      </div>
+
+      <div class="tab-bar" id="settingsTabs">
+        <button class="tab-btn active" data-tab="overlay">通常</button>
+        <button class="tab-btn" data-tab="nico">ニコニコ</button>
+        <button class="tab-btn" data-tab="supers">Supers</button>
+        <button class="tab-btn" data-tab="effects">エフェクト</button>
       </div>
     </div>
 
   </div>
 
   <div class="right-panel">
-    <div class="settings-row">
+    <div class="tab-content">
+      <div class="settings-row" id="settingsPanel">
       <!-- オーバーレイ設定 -->
       <div class="settings-col">
         <div class="color-settings">
@@ -528,6 +781,28 @@
         </div>
       </div>
     </div>
+
+      <div class="viewer-row hidden" id="viewerPanel">
+      <div class="viewer-card" id="viewerCommentsCard">
+        <div class="viewer-controls">
+          <input type="text" id="commentFilter" placeholder="検索: 名前 / コメント" />
+          <label><input type="checkbox" id="commentPause" /> 一時停止</label>
+        </div>
+        <div class="list-box" id="commentList"></div>
+      </div>
+
+      <div class="viewer-card hidden" id="viewerSupersCard">
+        <h2>💎 スパチャ・メンバー読み</h2>
+        <div class="viewer-controls">
+          <label><input type="checkbox" id="superUnreadOnly" checked /> 未読のみ</label>
+          <button id="btnSuperMarkAll" class="secondary">全て既読</button>
+          <button id="btnSuperCopy">未読をコピー</button>
+          <span id="superCount" class="small"></span>
+        </div>
+        <div class="list-box" id="superList"></div>
+      </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -544,6 +819,21 @@
   const effectStatus = document.getElementById("effectStatus");
   const KEY = "yt-overlay-input";
   const EFFECT_ENDPOINT = "http://127.0.0.1:5000/trigger-effect";
+  const mainTabs = document.querySelectorAll("#mainTabs .tab-btn");
+  const settingsTabs = document.querySelectorAll("#settingsTabs .tab-btn");
+  const viewerTabs = document.querySelectorAll("#viewerTabs .tab-btn");
+  const settingsTabsBar = document.getElementById("settingsTabs");
+  const viewerTabsBar = document.getElementById("viewerTabs");
+  const settingsPanel = document.getElementById("settingsPanel");
+  const viewerPanel = document.getElementById("viewerPanel");
+  const viewerCommentsCard = document.getElementById("viewerCommentsCard");
+  const viewerSupersCard = document.getElementById("viewerSupersCard");
+  const settingsCols = settingsPanel ? settingsPanel.querySelectorAll(".settings-col") : [];
+  const overlayCol = settingsCols[0] || null;
+  const nicoCol = settingsCols[1] || null;
+  const supersCol = settingsCols[2] || null;
+  const supersBox = supersCol ? supersCol.querySelector(".color-settings") : null;
+  const effectsBox = supersCol ? supersCol.querySelector(".effect-box") : null;
 
   window.addEventListener("DOMContentLoaded", () => {
     const saved = localStorage.getItem(KEY);
@@ -551,6 +841,66 @@
       inputTarget.value = saved;
     }
 
+    const mainTabSaved = localStorage.getItem("yt-overlay-main-tab") || "settings";
+    const settingsTabSaved = localStorage.getItem("yt-overlay-settings-tab") || "overlay";
+    const viewerTabSaved = localStorage.getItem("yt-overlay-viewer-tab") || "comments";
+
+    function setActiveTab(buttons, target) {
+      buttons.forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === target);
+      });
+    }
+
+    function showMainTab(name) {
+      if (name === "viewer") {
+        if (viewerPanel) viewerPanel.classList.remove("hidden");
+        if (settingsPanel) settingsPanel.classList.add("hidden");
+        if (settingsTabsBar) settingsTabsBar.classList.add("hidden");
+        if (viewerTabsBar) viewerTabsBar.classList.remove("hidden");
+      } else {
+        if (viewerPanel) viewerPanel.classList.add("hidden");
+        if (settingsPanel) settingsPanel.classList.remove("hidden");
+        if (settingsTabsBar) settingsTabsBar.classList.remove("hidden");
+        if (viewerTabsBar) viewerTabsBar.classList.add("hidden");
+      }
+      setActiveTab(mainTabs, name);
+      localStorage.setItem("yt-overlay-main-tab", name);
+    }
+
+    function showSettingsTab(name) {
+      if (overlayCol) overlayCol.classList.toggle("hidden", name !== "overlay");
+      if (nicoCol) nicoCol.classList.toggle("hidden", name !== "nico");
+      if (supersCol) supersCol.classList.toggle("hidden", name !== "supers" && name !== "effects");
+      if (supersBox) supersBox.classList.toggle("hidden", name !== "supers");
+      if (effectsBox) effectsBox.classList.toggle("hidden", name !== "effects");
+      setActiveTab(settingsTabs, name);
+      localStorage.setItem("yt-overlay-settings-tab", name);
+    }
+
+    function showViewerTab(name) {
+      if (viewerCommentsCard) viewerCommentsCard.classList.toggle("hidden", name !== "comments");
+      if (viewerSupersCard) viewerSupersCard.classList.toggle("hidden", name !== "supers");
+      setActiveTab(viewerTabs, name);
+      localStorage.setItem("yt-overlay-viewer-tab", name);
+    }
+
+
+    mainTabs.forEach((btn) => {
+      btn.addEventListener("click", () => showMainTab(btn.dataset.tab));
+    });
+
+    settingsTabs.forEach((btn) => {
+      btn.addEventListener("click", () => showSettingsTab(btn.dataset.tab));
+    });
+
+    viewerTabs.forEach((btn) => {
+      btn.addEventListener("click", () => showViewerTab(btn.dataset.tab));
+    });
+
+
+    showSettingsTab(settingsTabSaved);
+    showViewerTab(viewerTabSaved);
+    showMainTab(mainTabSaved);
   });
 
   btnStart.addEventListener("click", () => {
@@ -968,6 +1318,421 @@
   setTimeout(() => {
     sendAllSettings();
   }, 500);
+
+  // ========== コメントビュー / スパチャ読み ==========
+  const COMMENTS_ENDPOINT = "http://127.0.0.1:5000/comments";
+  const SUPER_READ_KEY = "yt-overlay-super-read";
+
+  const commentFilter = document.getElementById("commentFilter");
+  const commentPause = document.getElementById("commentPause");
+  const commentList = document.getElementById("commentList");
+  const superList = document.getElementById("superList");
+  const superUnreadOnly = document.getElementById("superUnreadOnly");
+  const btnSuperMarkAll = document.getElementById("btnSuperMarkAll");
+  const btnSuperCopy = document.getElementById("btnSuperCopy");
+  const superCount = document.getElementById("superCount");
+
+  const commentStore = new Map();
+  const highlightStartById = new Map();
+  let initialLoaded = false;
+  let lastAfterMs = 0;
+  let currentVideoId = null;
+  let superReadMap = {};
+
+  const superKinds = new Set([
+    "paid",
+    "sticker",
+    "membership",
+    "gift_purchase",
+    "gift_redeem",
+  ]);
+
+  function currentReadKey() {
+    return currentVideoId || "default";
+  }
+
+  function loadReadMap() {
+    try {
+      const raw = localStorage.getItem(SUPER_READ_KEY);
+      superReadMap = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      superReadMap = {};
+    }
+    const key = currentReadKey();
+    if (!superReadMap[key]) superReadMap[key] = {};
+  }
+
+  function saveReadMap() {
+    localStorage.setItem(SUPER_READ_KEY, JSON.stringify(superReadMap));
+  }
+
+  function setRead(id, value) {
+    const key = currentReadKey();
+    if (!superReadMap[key]) superReadMap[key] = {};
+    if (value) {
+      superReadMap[key][id] = true;
+    } else {
+      delete superReadMap[key][id];
+    }
+    saveReadMap();
+  }
+
+  function isRead(id) {
+    const key = currentReadKey();
+    return !!(superReadMap[key] && superReadMap[key][id]);
+  }
+
+  function findLatestVideoId(data) {
+    let latest = null;
+    for (const msg of data) {
+      if (!msg || !msg.video_id) continue;
+      const ts = Number.isFinite(msg.timestamp_ms) ? msg.timestamp_ms : 0;
+      if (!latest || ts > latest.ts) {
+        latest = { id: msg.video_id, ts };
+      }
+    }
+    return latest ? latest.id : null;
+  }
+
+  function buildId(msg) {
+    return (
+      msg.id ||
+      `${msg.timestamp_ms || 0}_${msg.author || ""}_${msg.text || ""}`
+    );
+  }
+
+  function formatTime(ms) {
+    if (!Number.isFinite(ms)) return "";
+    const d = new Date(ms);
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    const s = String(d.getSeconds()).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+  }
+
+  function kindLabel(kind) {
+    switch (kind) {
+      case "paid":
+        return "スパチャ";
+      case "sticker":
+        return "スパチャ(スタンプ)";
+      case "membership":
+        return "メンバー";
+      case "gift_purchase":
+        return "メンギフ購入";
+      case "gift_redeem":
+        return "メンギフ配布";
+      default:
+        return kind || "コメント";
+    }
+  }
+
+  function amountLabel(msg) {
+    if (msg.amount_text) return msg.amount_text;
+    if (Number.isFinite(msg.amount)) return "¥" + msg.amount;
+    return "";
+  }
+
+  function textFromMsg(msg) {
+    if (Array.isArray(msg.parts)) {
+      return msg.parts
+        .map((part) => {
+          if (part.type === "text") return part.text || "";
+          if (part.type === "emoji") return part.alt || "";
+          if (part.type === "sticker") return "[sticker]";
+          return "";
+        })
+        .join("");
+    }
+    return msg.text || "";
+  }
+
+  function renderParts(container, msg) {
+    container.textContent = "";
+    if (Array.isArray(msg.parts)) {
+      for (const part of msg.parts) {
+        if (part.type === "text") {
+          container.append(document.createTextNode(part.text || ""));
+        } else if (part.type === "emoji") {
+          const img = document.createElement("img");
+          img.className = "emoji";
+          img.src = part.url;
+          img.alt = part.alt || "";
+          container.append(img);
+        } else if (part.type === "sticker") {
+          const img = document.createElement("img");
+          img.className = "sticker";
+          img.src = part.url;
+          img.alt = part.alt || "";
+          container.append(img);
+        }
+      }
+      return;
+    }
+    container.textContent = msg.text || "";
+  }
+
+  function trimStore() {
+    if (commentStore.size <= 500) return;
+    const items = Array.from(commentStore.values()).sort(
+      (a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0)
+    );
+    const keep = items.slice(-500);
+    commentStore.clear();
+    for (const msg of keep) {
+      commentStore.set(buildId(msg), msg);
+    }
+  }
+
+  function renderComments() {
+    if (commentPause.checked) return;
+    const filter = commentFilter.value.trim().toLowerCase();
+    const items = Array.from(commentStore.values())
+      .filter((msg) => {
+        if (!filter) return true;
+        const author = (msg.author || "").toLowerCase();
+        const text = textFromMsg(msg).toLowerCase();
+        return author.includes(filter) || text.includes(filter);
+      })
+      .sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0));
+
+    const shouldStick =
+      commentList.scrollTop + commentList.clientHeight >=
+      commentList.scrollHeight - 24;
+    commentList.innerHTML = "";
+    for (const msg of items) {
+      const item = document.createElement("div");
+      item.className = "list-item";
+      const id = buildId(msg);
+      const now = Date.now();
+      const startAt = highlightStartById.get(id);
+      if (startAt && now - startAt <= 10000) {
+        item.classList.add("new");
+        item.style.animationDelay = `-${Math.min(9.9, (now - startAt) / 1000).toFixed(2)}s`;
+      } else if (startAt) {
+        highlightStartById.delete(id);
+      }
+
+      const avatar = document.createElement("div");
+      avatar.className = "chat-avatar";
+      if (msg.icon) {
+        const img = document.createElement("img");
+        img.src = msg.icon;
+        img.alt = msg.author || "";
+        avatar.appendChild(img);
+      }
+
+      const content = document.createElement("div");
+      content.className = "chat-content";
+
+      const header = document.createElement("div");
+      header.className = "chat-header";
+      const time = document.createElement("span");
+      time.className = "chat-time";
+      time.textContent = formatTime(msg.timestamp_ms);
+      const author = document.createElement("span");
+      author.className = "item-author";
+      if (msg.is_member || msg.kind === "membership") {
+        author.classList.add("member");
+      }
+      if (msg.is_moderator) {
+        author.classList.add("moderator");
+      }
+      author.textContent = msg.author || "(no name)";
+      header.append(time, author);
+
+      const text = document.createElement("div");
+      text.className = "item-text";
+      renderParts(text, msg);
+
+      content.append(header, text);
+      item.append(avatar, content);
+      commentList.appendChild(item);
+    }
+    if (shouldStick) {
+      commentList.scrollTop = commentList.scrollHeight;
+    }
+  }
+
+  function renderSupers() {
+    const unreadOnly = superUnreadOnly.checked;
+    const items = Array.from(commentStore.values())
+      .filter((msg) => superKinds.has(msg.kind))
+      .sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0));
+
+    const shouldStick =
+      superList.scrollTop + superList.clientHeight >=
+      superList.scrollHeight - 24;
+    let unreadCount = 0;
+    superList.innerHTML = "";
+    for (const msg of items) {
+      const id = buildId(msg);
+      const read = isRead(id);
+      if (!read) unreadCount += 1;
+      if (unreadOnly && read) continue;
+
+      const item = document.createElement("div");
+      item.className = "list-item" + (read ? "" : " unread");
+      item.dataset.id = id;
+      const now = Date.now();
+      const startAt = highlightStartById.get(id);
+      if (startAt && now - startAt <= 10000) {
+        item.classList.add("new");
+        item.style.animationDelay = `-${Math.min(9.9, (now - startAt) / 1000).toFixed(2)}s`;
+      } else if (startAt) {
+        highlightStartById.delete(id);
+      }
+
+      const avatar = document.createElement("div");
+      avatar.className = "chat-avatar";
+      if (msg.icon) {
+        const img = document.createElement("img");
+        img.src = msg.icon;
+        img.alt = msg.author || "";
+        avatar.appendChild(img);
+      }
+
+      const content = document.createElement("div");
+      content.className = "chat-content";
+
+      const header = document.createElement("div");
+      header.className = "chat-header";
+      const time = document.createElement("span");
+      time.className = "chat-time";
+      time.textContent = formatTime(msg.timestamp_ms);
+      const author = document.createElement("span");
+      author.className = "item-author";
+      if (msg.is_member || msg.kind === "membership") {
+        author.classList.add("member");
+      }
+      if (msg.is_moderator) {
+        author.classList.add("moderator");
+      }
+      author.textContent = msg.author || "(no name)";
+      header.append(time, author);
+
+      const amountText = amountLabel(msg);
+      if (amountText) {
+        const amount = document.createElement("span");
+        amount.className = "item-badge";
+        amount.textContent = amountText;
+        header.appendChild(amount);
+      } else {
+        const kind = document.createElement("span");
+        kind.className = "item-badge";
+        kind.textContent = kindLabel(msg.kind);
+        header.appendChild(kind);
+      }
+
+      const text = document.createElement("div");
+      text.className = "item-text";
+      renderParts(text, msg);
+
+      content.append(header, text);
+      item.append(avatar, content);
+      item.addEventListener("click", () => {
+        const next = !isRead(id);
+        setRead(id, next);
+        renderSupers();
+      });
+
+      superList.appendChild(item);
+    }
+    if (shouldStick) {
+      superList.scrollTop = superList.scrollHeight;
+    }
+
+    superCount.textContent = `未読: ${unreadCount}`;
+  }
+
+  async function fetchCommentsOnce(forceFull = false) {
+    const params = new URLSearchParams();
+    params.set("limit", "200");
+    if (!forceFull && lastAfterMs > 0) {
+      params.set("after", String(lastAfterMs));
+    }
+    try {
+      const res = await fetch(`${COMMENTS_ENDPOINT}?${params.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+
+      const latestVideoId = findLatestVideoId(data);
+      if (latestVideoId && latestVideoId !== currentVideoId) {
+        currentVideoId = latestVideoId;
+        commentStore.clear();
+        highlightStartById.clear();
+        initialLoaded = false;
+        lastAfterMs = 0;
+        loadReadMap();
+        await fetchCommentsOnce(true);
+        return;
+      }
+
+      let maxTs = lastAfterMs;
+      for (const msg of data) {
+        if (currentVideoId && msg.video_id && msg.video_id !== currentVideoId) {
+          continue;
+        }
+        const id = buildId(msg);
+        if (!commentStore.has(id)) {
+          commentStore.set(id, msg);
+          if (initialLoaded) {
+            highlightStartById.set(id, Date.now());
+          }
+        }
+        const ts = Number.isFinite(msg.timestamp_ms) ? msg.timestamp_ms : 0;
+        if (ts > maxTs) maxTs = ts;
+      }
+      if (!initialLoaded) {
+        initialLoaded = true;
+      }
+      lastAfterMs = maxTs;
+      trimStore();
+      renderComments();
+      renderSupers();
+    } catch (e) {
+      console.error("fetchCommentsOnce error", e);
+    }
+  }
+
+  commentFilter.addEventListener("input", renderComments);
+  commentPause.addEventListener("change", renderComments);
+  superUnreadOnly.addEventListener("change", renderSupers);
+  btnSuperMarkAll.addEventListener("click", () => {
+    const key = currentReadKey();
+    if (!superReadMap[key]) superReadMap[key] = {};
+    for (const msg of commentStore.values()) {
+      if (!superKinds.has(msg.kind)) continue;
+      superReadMap[key][buildId(msg)] = true;
+    }
+    saveReadMap();
+    renderSupers();
+  });
+  btnSuperCopy.addEventListener("click", async () => {
+    const items = Array.from(commentStore.values())
+      .filter((msg) => superKinds.has(msg.kind))
+      .filter((msg) => !isRead(buildId(msg)))
+      .sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0));
+    const lines = items.map((msg) => {
+      const time = formatTime(msg.timestamp_ms);
+      const kind = kindLabel(msg.kind);
+      const amount = amountLabel(msg);
+      const author = msg.author || "(no name)";
+      const text = textFromMsg(msg);
+      return [time, kind, amount, author, text].filter(Boolean).join(" | ");
+    });
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      superCount.textContent = `未読: ${lines.length} (コピー済み)`;
+    } catch (e) {
+      console.error("copy failed", e);
+    }
+  });
+
+  loadReadMap();
+  setInterval(fetchCommentsOnce, 1000);
+  fetchCommentsOnce(true);
 </script>
 </body>
 </html>

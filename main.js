@@ -23,6 +23,7 @@ const {
 } = require("./youtubeChat");
 
 let mainWindow = null;
+let boundsSaveTimer = null;
 let currentColors = {
   overlay: {
     fontFamily: "Noto Sans JP",
@@ -637,11 +638,47 @@ function createObsLauncherFiles() {
  * 設定用ウィンドウ
  */
 function createMainWindow(launchersDir) {
+  const loadWindowState = () => {
+    try {
+      const statePath = path.join(app.getPath("userData"), "window-state.json");
+      if (!fs.existsSync(statePath)) return null;
+      const raw = fs.readFileSync(statePath, "utf8");
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== "object") return null;
+      const width = parseInt(data.width, 10);
+      const height = parseInt(data.height, 10);
+      const x = parseInt(data.x, 10);
+      const y = parseInt(data.y, 10);
+      if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+      return {
+        width: Math.max(360, width),
+        height: Math.max(540, height),
+        x: Number.isFinite(x) ? x : undefined,
+        y: Number.isFinite(y) ? y : undefined,
+      };
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const saveWindowState = () => {
+    if (!isWindowAlive()) return;
+    try {
+      const statePath = path.join(app.getPath("userData"), "window-state.json");
+      const bounds = mainWindow.getBounds();
+      fs.writeFileSync(statePath, JSON.stringify(bounds), "utf8");
+    } catch (_) {}
+  };
+
+  const saved = loadWindowState();
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 620,
+    width: saved?.width || 1200,
+    height: saved?.height || 620,
+    x: saved?.x,
+    y: saved?.y,
     resizable: true,
-    minWidth: 1000,
+    minWidth: 360,
     minHeight: 540,
     webPreferences: {
       nodeIntegration: true,
@@ -652,8 +689,20 @@ function createMainWindow(launchersDir) {
   mainWindow.loadFile(path.join(__dirname, "settings.html"));
 
   mainWindow.on("closed", () => {
+    if (boundsSaveTimer) {
+      clearTimeout(boundsSaveTimer);
+      boundsSaveTimer = null;
+    }
     mainWindow = null;
   });
+
+  const scheduleSave = () => {
+    if (boundsSaveTimer) clearTimeout(boundsSaveTimer);
+    boundsSaveTimer = setTimeout(saveWindowState, 500);
+  };
+
+  mainWindow.on("resize", scheduleSave);
+  mainWindow.on("move", scheduleSave);
 
   // レンダラに「ランチャーフォルダのパス」を通知
   mainWindow.webContents.on("did-finish-load", () => {
@@ -716,6 +765,7 @@ ipcMain.on("launchers:open", () => {
   const dir = path.join(app.getPath("userData"), "obs-launchers");
   shell.openPath(dir);
 });
+
 
 // カラー設定の更新
 ipcMain.on("colors:update", (_event, settings) => {
