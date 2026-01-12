@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "youtube-overlay-virtualcam/1.0.0": {
+        "runtime": {
+          "youtube-overlay-virtualcam.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "youtube-overlay-virtualcam/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

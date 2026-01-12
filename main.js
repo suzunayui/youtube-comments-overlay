@@ -1,5 +1,6 @@
 // main.js
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
@@ -24,6 +25,10 @@ const {
 
 let mainWindow = null;
 let boundsSaveTimer = null;
+let virtualCamWindow = null;
+let virtualCamProcess = null;
+let virtualCamStatus = "stopped";
+let virtualCamCmdRunning = false;
 let currentColors = {
   overlay: {
     fontFamily: "Noto Sans JP",
@@ -712,6 +717,95 @@ function createMainWindow(launchersDir) {
   });
 }
 
+function createVirtualCamWindow({ width, height }) {
+  if (virtualCamWindow && !virtualCamWindow.isDestroyed()) {
+    return virtualCamWindow;
+  }
+  virtualCamWindow = new BrowserWindow({
+    width,
+    height,
+    resizable: false,
+    movable: true,
+    minimizable: true,
+    maximizable: false,
+    autoHideMenuBar: true,
+    title: "YouTube Chat Overlay VirtualCam",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  virtualCamWindow.loadURL("http://127.0.0.1:5000/");
+  virtualCamWindow.on("closed", () => {
+    virtualCamWindow = null;
+  });
+  return virtualCamWindow;
+}
+
+function stopVirtualCam() {
+  if (virtualCamProcess) {
+    try {
+      virtualCamProcess.kill("SIGTERM");
+    } catch (_) {}
+    virtualCamProcess = null;
+  }
+  if (virtualCamWindow && !virtualCamWindow.isDestroyed()) {
+    virtualCamWindow.close();
+  }
+  virtualCamStatus = "stopped";
+  if (isWindowAlive()) {
+    mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
+  }
+}
+
+function startVirtualCam(opts) {
+  if (virtualCamProcess) return;
+  const width = Math.max(320, parseInt(opts.width, 10) || 1280);
+  const height = Math.max(240, parseInt(opts.height, 10) || 720);
+  const fps = Math.max(5, Math.min(60, parseInt(opts.fps, 10) || 30));
+  const deviceName = String(opts.device || "Unity Video Capture");
+
+  const win = createVirtualCamWindow({ width, height });
+  const title = win.getTitle();
+  const args = [
+    "-f", "gdigrab",
+    "-framerate", String(fps),
+    "-i", `title=${title}`,
+    "-vf", `scale=${width}:${height}`,
+    "-pix_fmt", "yuv420p",
+    "-f", "dshow",
+    `video=${deviceName}`,
+  ];
+
+  virtualCamStatus = "starting";
+  if (isWindowAlive()) {
+    mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
+  }
+
+  virtualCamProcess = spawn("ffmpeg", args, { windowsHide: true });
+  virtualCamProcess.on("error", (err) => {
+    virtualCamStatus = "error: " + (err?.message || String(err));
+    if (isWindowAlive()) {
+      mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
+    }
+    stopVirtualCam();
+  });
+  virtualCamProcess.on("exit", () => {
+    if (virtualCamProcess) {
+      virtualCamProcess = null;
+    }
+    virtualCamStatus = "stopped";
+    if (isWindowAlive()) {
+      mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
+    }
+  });
+
+  virtualCamStatus = "running";
+  if (isWindowAlive()) {
+    mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
+  }
+}
+
 // ==============================
 // IPC: 開始 / 停止
 // ==============================
@@ -764,6 +858,70 @@ ipcMain.on("chat:stop", () => {
 ipcMain.on("launchers:open", () => {
   const dir = path.join(app.getPath("userData"), "obs-launchers");
   shell.openPath(dir);
+});
+
+ipcMain.on("virtualcam:start", (_event, opts) => {
+  startVirtualCam(opts || {});
+});
+
+ipcMain.on("virtualcam:stop", () => {
+  stopVirtualCam();
+});
+
+function runVirtualCamCli(args, onDone) {
+  if (virtualCamCmdRunning) {
+    onDone({ ok: false, code: -1, output: "already running" });
+    return;
+  }
+  virtualCamCmdRunning = true;
+  const projPath = path.join(__dirname, "youtube-overlay-virtualcam");
+  const cmdArgs = ["run", "--project", projPath, "--", ...args];
+  const proc = spawn("dotnet", cmdArgs, { windowsHide: true });
+  let output = "";
+  proc.stdout.on("data", (d) => {
+    output += d.toString();
+  });
+  proc.stderr.on("data", (d) => {
+    output += d.toString();
+  });
+  proc.on("close", (code) => {
+    virtualCamCmdRunning = false;
+    onDone({ ok: code === 0, code: code ?? -1, output });
+  });
+  proc.on("error", (err) => {
+    virtualCamCmdRunning = false;
+    onDone({ ok: false, code: -1, output: err?.message || String(err) });
+  });
+}
+
+ipcMain.on("virtualcam:register", (_event, opts) => {
+  const name = String(opts?.name || "YouTube Overlay VirtualCam");
+  const source = String(opts?.source || "youtube-overlay-virtualcam");
+  const lifetime = String(opts?.lifetime || "system");
+  const access = String(opts?.access || "all");
+  runVirtualCamCli(
+    ["register", "--name", name, "--source", source, "--lifetime", lifetime, "--access", access],
+    (result) => {
+      if (isWindowAlive()) {
+        mainWindow.webContents.send("virtualcam:register:result", result);
+      }
+    }
+  );
+});
+
+ipcMain.on("virtualcam:unregister", (_event, opts) => {
+  const name = String(opts?.name || "YouTube Overlay VirtualCam");
+  const source = String(opts?.source || "youtube-overlay-virtualcam");
+  const lifetime = String(opts?.lifetime || "system");
+  const access = String(opts?.access || "all");
+  runVirtualCamCli(
+    ["unregister", "--name", name, "--source", source, "--lifetime", lifetime, "--access", access],
+    (result) => {
+      if (isWindowAlive()) {
+        mainWindow.webContents.send("virtualcam:register:result", result);
+      }
+    }
+  );
 });
 
 

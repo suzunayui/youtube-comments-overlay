@@ -111,6 +111,54 @@
     font-size: 10px;
   }
 
+  #virtualCamBox {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    background: #25253a;
+    font-size: 10px;
+  }
+
+  #virtualCamBox input[type="text"],
+  #virtualCamBox input[type="number"] {
+    width: 100%;
+    padding: 4px 6px;
+    margin-top: 4px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3d;
+    color: #f5f5f5;
+    box-sizing: border-box;
+    font-size: 11px;
+  }
+
+  #virtualCamBox button {
+    margin-top: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: #3f51b5;
+    color: #fff;
+  }
+
+  #virtualCamBox button.secondary {
+    background: #5a5a6e;
+  }
+
+  #virtualCamBox select {
+    width: 100%;
+    padding: 4px 6px;
+    margin-top: 4px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #2a2a3d;
+    color: #f5f5f5;
+    box-sizing: border-box;
+    font-size: 11px;
+  }
+
   #launchersBox code {
     background: #333;
     padding: 1px 3px;
@@ -534,6 +582,33 @@
         </div>
       </div>
 
+      <div id="virtualCamBox">
+        <div>仮想カメラ登録 (Media Foundation)</div>
+        <label>表示名
+          <input type="text" id="mfCamName" value="YouTube Overlay VirtualCam" />
+        </label>
+        <label>ソースID
+          <input type="text" id="mfCamSource" value="youtube-overlay-virtualcam" />
+        </label>
+        <label>ライフタイム
+          <select id="mfCamLifetime">
+            <option value="system">system (全体)</option>
+            <option value="session">session (一時)</option>
+          </select>
+        </label>
+        <label>アクセス
+          <select id="mfCamAccess">
+            <option value="all">all (全ユーザー)</option>
+            <option value="current">current (現ユーザー)</option>
+          </select>
+        </label>
+        <button id="btnMfRegister">登録</button>
+        <button id="btnMfUnregister" class="secondary">解除</button>
+        <div class="small" id="mfCamStatus">状態: 未実行</div>
+        <pre class="small" id="mfCamLog" style="white-space: pre-wrap; margin: 6px 0 0;"></pre>
+        <div class="small">※管理者権限が必要な場合があります</div>
+      </div>
+
       <div class="tab-bar" id="mainTabs">
         <button class="tab-btn active" data-tab="settings">設定</button>
         <button class="tab-btn" data-tab="viewer">コメント閲覧</button>
@@ -816,6 +891,14 @@
 
   const launchersPathEl = document.getElementById("launchersPath");
   const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
+  const mfCamName = document.getElementById("mfCamName");
+  const mfCamSource = document.getElementById("mfCamSource");
+  const mfCamLifetime = document.getElementById("mfCamLifetime");
+  const mfCamAccess = document.getElementById("mfCamAccess");
+  const btnMfRegister = document.getElementById("btnMfRegister");
+  const btnMfUnregister = document.getElementById("btnMfUnregister");
+  const mfCamStatus = document.getElementById("mfCamStatus");
+  const mfCamLog = document.getElementById("mfCamLog");
   const effectStatus = document.getElementById("effectStatus");
   const KEY = "yt-overlay-input";
   const EFFECT_ENDPOINT = "http://127.0.0.1:5000/trigger-effect";
@@ -901,6 +984,15 @@
     showSettingsTab(settingsTabSaved);
     showViewerTab(viewerTabSaved);
     showMainTab(mainTabSaved);
+
+    const mfName = localStorage.getItem("yt-overlay-mf-name");
+    const mfSource = localStorage.getItem("yt-overlay-mf-source");
+    const mfLifetime = localStorage.getItem("yt-overlay-mf-lifetime");
+    const mfAccess = localStorage.getItem("yt-overlay-mf-access");
+    if (mfName && mfCamName) mfCamName.value = mfName;
+    if (mfSource && mfCamSource) mfCamSource.value = mfSource;
+    if (mfLifetime && mfCamLifetime) mfCamLifetime.value = mfLifetime;
+    if (mfAccess && mfCamAccess) mfCamAccess.value = mfAccess;
   });
 
   btnStart.addEventListener("click", () => {
@@ -943,6 +1035,54 @@
 
   btnOpenLaunchers.addEventListener("click", () => {
     ipcRenderer.send("launchers:open");
+  });
+
+  function saveMfSettings() {
+    if (mfCamName) localStorage.setItem("yt-overlay-mf-name", mfCamName.value.trim());
+    if (mfCamSource) localStorage.setItem("yt-overlay-mf-source", mfCamSource.value.trim());
+    if (mfCamLifetime) localStorage.setItem("yt-overlay-mf-lifetime", mfCamLifetime.value);
+    if (mfCamAccess) localStorage.setItem("yt-overlay-mf-access", mfCamAccess.value);
+  }
+
+  function mfPayload() {
+    return {
+      name: mfCamName ? mfCamName.value.trim() : "YouTube Overlay VirtualCam",
+      source: mfCamSource ? mfCamSource.value.trim() : "youtube-overlay-virtualcam",
+      lifetime: mfCamLifetime ? mfCamLifetime.value : "system",
+      access: mfCamAccess ? mfCamAccess.value : "all",
+    };
+  }
+
+  if (btnMfRegister) {
+    btnMfRegister.addEventListener("click", () => {
+      saveMfSettings();
+      if (mfCamStatus) mfCamStatus.textContent = "状態: 登録中...";
+      ipcRenderer.send("virtualcam:register", mfPayload());
+    });
+  }
+
+  if (btnMfUnregister) {
+    btnMfUnregister.addEventListener("click", () => {
+      saveMfSettings();
+      if (mfCamStatus) mfCamStatus.textContent = "状態: 解除中...";
+      ipcRenderer.send("virtualcam:unregister", mfPayload());
+    });
+  }
+
+  ipcRenderer.on("virtualcam:register:result", (_event, result) => {
+    if (!mfCamStatus) return;
+    const ok = result && result.ok;
+    const code = result ? result.code : "";
+    const output = result ? result.output : "";
+    const lines = output ? output.trim().split(/\r?\n/) : [];
+    const tail = lines.slice(-10).join("\n");
+    mfCamStatus.textContent = ok
+      ? "状態: 完了"
+      : `状態: 失敗 (code=${code})`;
+    if (mfCamLog) {
+      mfCamLog.textContent = tail || "";
+    }
+    if (output) console.log("virtualcam cli:", output);
   });
 
   // エフェクト手動トリガー

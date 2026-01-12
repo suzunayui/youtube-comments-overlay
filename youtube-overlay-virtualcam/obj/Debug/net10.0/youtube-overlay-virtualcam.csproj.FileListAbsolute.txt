@@ -1,0 +1,15 @@
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.AssemblyInfoInputs.cache
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.AssemblyInfo.cs
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.csproj.CoreCompileInputs.cache
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.sourcelink.json
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\bin\Debug\net10.0\youtube-overlay-virtualcam.exe
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\bin\Debug\net10.0\youtube-overlay-virtualcam.deps.json
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\bin\Debug\net10.0\youtube-overlay-virtualcam.runtimeconfig.json
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\bin\Debug\net10.0\youtube-overlay-virtualcam.dll
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\bin\Debug\net10.0\youtube-overlay-virtualcam.pdb
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.dll
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\refint\youtube-overlay-virtualcam.dll
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.pdb
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\youtube-overlay-virtualcam.genruntimeconfig.cache
+C:\Users\mikan\youtube-comments-overlay\youtube-overlay-virtualcam\obj\Debug\net10.0\ref\youtube-overlay-virtualcam.dll
