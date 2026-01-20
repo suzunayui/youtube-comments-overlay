@@ -549,6 +549,14 @@
     font-size: 10px;
     white-space: nowrap;
   }
+  .item-badge.first-time {
+    background: #1f6f43;
+    color: #e9ffef;
+  }
+  .item-badge.last-stream {
+    background: #2b314a;
+    color: #d8deff;
+  }
 
   @keyframes blinkNew {
     0%, 100% { background: rgba(255, 211, 64, 0.35); box-shadow: 0 0 0 1px rgba(255, 211, 64, 0.6); }
@@ -1550,6 +1558,14 @@
     return `${h}:${m}:${s}`;
   }
 
+  function formatDateMd(ms) {
+    if (!Number.isFinite(ms)) return "";
+    const d = new Date(ms);
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    return `${mo}/${da}`;
+  }
+
   function kindLabel(kind) {
     switch (kind) {
       case "paid":
@@ -1612,6 +1628,36 @@
     container.textContent = msg.text || "";
   }
 
+  function hexToRgba(hex, alpha) {
+    if (!hex || typeof hex !== "string") return "";
+    const raw = hex.replace("#", "");
+    if (raw.length !== 6) return "";
+    const r = parseInt(raw.slice(0, 2), 16);
+    const g = parseInt(raw.slice(2, 4), 16);
+    const b = parseInt(raw.slice(4, 6), 16);
+    const a = Number.isFinite(alpha) ? alpha / 100 : 1;
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  function getMembershipBg() {
+    const color =
+      (colorInputs.colorMembership && colorInputs.colorMembership.value) ||
+      defaultColors.colorMembership;
+    const alphaRaw =
+      (colorInputs.alphaMembership && Number(colorInputs.alphaMembership.value)) ??
+      defaultColors.alphaMembership;
+    const alpha = Number.isFinite(alphaRaw) ? alphaRaw : 100;
+    return hexToRgba(color, alpha);
+  }
+
+  function applyMembershipStyle(item) {
+    const bg = getMembershipBg();
+    if (bg) {
+      item.style.background = bg;
+      item.style.boxShadow = "0 0 0 1px " + bg;
+    }
+  }
+
   function trimStore() {
     if (commentStore.size <= 500) return;
     const items = Array.from(commentStore.values()).sort(
@@ -1653,6 +1699,15 @@
         highlightStartById.delete(id);
       }
 
+      if (msg && (msg.kind === "paid" || msg.kind === "sticker") && msg.colors) {
+        if (msg.colors.body_bg) {
+          item.style.background = msg.colors.body_bg;
+          item.style.boxShadow = "0 0 0 1px " + msg.colors.body_bg;
+        }
+      } else if (msg && (msg.kind === "membership" || msg.kind === "gift_purchase" || msg.kind === "gift_redeem")) {
+        applyMembershipStyle(item);
+      }
+
       const avatar = document.createElement("div");
       avatar.className = "chat-avatar";
       if (msg.icon) {
@@ -1680,10 +1735,27 @@
       }
       author.textContent = msg.author || "(no name)";
       header.append(time, author);
+      if (msg.is_first_time) {
+        const first = document.createElement("span");
+        first.className = "item-badge first-time";
+        first.textContent = "初見";
+        header.appendChild(first);
+      } else if (msg.last_stream_first_ts && Number.isFinite(msg.last_stream_ago)) {
+        const last = document.createElement("span");
+        last.className = "item-badge last-stream";
+        const date = formatDateMd(msg.last_stream_first_ts);
+        last.textContent = `前回 ${date} (${msg.last_stream_ago}回前)`;
+        header.appendChild(last);
+      }
 
       const text = document.createElement("div");
       text.className = "item-text";
       renderParts(text, msg);
+
+      if (msg && (msg.kind === "paid" || msg.kind === "sticker") && msg.colors && msg.colors.body_text) {
+        author.style.color = msg.colors.body_text;
+        text.style.color = msg.colors.body_text;
+      }
 
       content.append(header, text);
       item.append(avatar, content);
@@ -1721,6 +1793,15 @@
         item.style.animationDelay = `-${Math.min(9.9, (now - startAt) / 1000).toFixed(2)}s`;
       } else if (startAt) {
         highlightStartById.delete(id);
+      }
+
+      if (msg && (msg.kind === "paid" || msg.kind === "sticker") && msg.colors) {
+        if (msg.colors.body_bg) {
+          item.style.background = msg.colors.body_bg;
+          item.style.boxShadow = "0 0 0 1px " + msg.colors.body_bg;
+        }
+      } else if (msg && (msg.kind === "membership" || msg.kind === "gift_purchase" || msg.kind === "gift_redeem")) {
+        applyMembershipStyle(item);
       }
 
       const avatar = document.createElement("div");
@@ -1767,6 +1848,11 @@
       const text = document.createElement("div");
       text.className = "item-text";
       renderParts(text, msg);
+
+      if (msg && (msg.kind === "paid" || msg.kind === "sticker") && msg.colors && msg.colors.body_text) {
+        author.style.color = msg.colors.body_text;
+        text.style.color = msg.colors.body_text;
+      }
 
       content.append(header, text);
       item.append(avatar, content);

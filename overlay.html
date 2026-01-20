@@ -205,18 +205,21 @@
 
         const kind = msg.kind || "text";
         const amount = msg.amount || 0;
+        const colors = msg.colors || null;
 
         if (kind === "membership" || kind === "gift_purchase" || kind === "gift_redeem") {
           cls.push("msg-kind-membership");
         } else if (kind === "paid" || kind === "sticker") {
-          if (amount >= 10000) {
-            cls.push("msg-paid-tier4");
-          } else if (amount >= 2000) {
-            cls.push("msg-paid-tier3");
-          } else if (amount >= 500) {
-            cls.push("msg-paid-tier2");
-          } else {
-            cls.push("msg-paid-tier1");
+          if (!colors || (!colors.body_bg && !colors.body_text)) {
+            if (amount >= 10000) {
+              cls.push("msg-paid-tier4");
+            } else if (amount >= 2000) {
+              cls.push("msg-paid-tier3");
+            } else if (amount >= 500) {
+              cls.push("msg-paid-tier2");
+            } else {
+              cls.push("msg-paid-tier1");
+            }
           }
         }
 
@@ -245,6 +248,24 @@
 
         const textSpan = document.createElement("span");
         textSpan.className = "text";
+
+        // YouTube 本家色 (paid / sticker)
+        if (colors && (kind === "paid" || kind === "sticker")) {
+          if (colors.body_bg) {
+            div.style.backgroundColor = colors.body_bg;
+            div.style.boxShadow = "0 0 15px " + colors.body_bg;
+          }
+
+          if (colors.body_text) {
+            author.style.color = colors.body_text;
+            textSpan.style.color = colors.body_text;
+
+            if (colors.body_text.toUpperCase() !== "#FFFFFF") {
+              author.style.textShadow = "none";
+              textSpan.style.textShadow = "none";
+            }
+          }
+        }
 
         // parts があれば、parts を使ってテキスト & 絵文字 & スタンプを構成
         if (msg.parts && Array.isArray(msg.parts) && msg.parts.length > 0) {

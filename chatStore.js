@@ -353,6 +353,80 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
   });
 }
 
+function getAuthorFirstSeenMap(authors) {
+  if (!db) return new Map();
+  const list = Array.isArray(authors)
+    ? Array.from(new Set(authors.map((a) => (a || "").trim()).filter(Boolean)))
+    : [];
+  if (list.length === 0) return new Map();
+  const placeholders = list.map(() => "?").join(",");
+  try {
+    const rows = db
+      .prepare(
+        `SELECT author, MIN(timestamp_ms) AS first_ts
+         FROM comments
+         WHERE author IN (${placeholders})
+         GROUP BY author`
+      )
+      .all(...list);
+    const map = new Map();
+    for (const r of rows) {
+      if (!r || !r.author) continue;
+      map.set(r.author, Number(r.first_ts) || 0);
+    }
+    return map;
+  } catch (err) {
+    console.warn("getAuthorFirstSeenMap sqlite error:", err.message || err);
+    return new Map();
+  }
+}
+
+function getVideoFirstSeenMap() {
+  if (!db) return new Map();
+  try {
+    const rows = db
+      .prepare(
+        `SELECT video_id, MIN(timestamp_ms) AS first_ts
+         FROM comments
+         WHERE video_id IS NOT NULL AND video_id != ""
+         GROUP BY video_id`
+      )
+      .all();
+    const map = new Map();
+    for (const r of rows) {
+      if (!r || !r.video_id) continue;
+      map.set(r.video_id, Number(r.first_ts) || 0);
+    }
+    return map;
+  } catch (err) {
+    console.warn("getVideoFirstSeenMap sqlite error:", err.message || err);
+    return new Map();
+  }
+}
+
+function getAuthorVideoFirstSeenRows(authors) {
+  if (!db) return [];
+  const list = Array.isArray(authors)
+    ? Array.from(new Set(authors.map((a) => (a || "").trim()).filter(Boolean)))
+    : [];
+  if (list.length === 0) return [];
+  const placeholders = list.map(() => "?").join(",");
+  try {
+    return db
+      .prepare(
+        `SELECT author, video_id, MIN(timestamp_ms) AS first_ts
+         FROM comments
+         WHERE author IN (${placeholders})
+           AND video_id IS NOT NULL AND video_id != ""
+         GROUP BY author, video_id`
+      )
+      .all(...list);
+  } catch (err) {
+    console.warn("getAuthorVideoFirstSeenRows sqlite error:", err.message || err);
+    return [];
+  }
+}
+
 function closeChatStore() {
   if (db) {
     try {
@@ -367,6 +441,9 @@ module.exports = {
   initChatStore,
   saveComment,
   getRecentComments,
+  getAuthorFirstSeenMap,
+  getVideoFirstSeenMap,
+  getAuthorVideoFirstSeenRows,
   getBossState,
   applyBossHit,
   resetBossState,

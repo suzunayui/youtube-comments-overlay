@@ -11,6 +11,9 @@ const {
   closeChatStore,
   getDbPath,
   getRecentComments,
+  getAuthorFirstSeenMap,
+  getVideoFirstSeenMap,
+  getAuthorVideoFirstSeenRows,
   getBossState,
   applyBossHit,
   resetBossState,
@@ -517,7 +520,60 @@ function createOverlayServer() {
           if (LIM) {
             out = out.slice(-LIM);
           }
-          return res.json(out);
+          const authorMap = getAuthorFirstSeenMap(out.map((r) => r.author));
+          const videoFirstMap = getVideoFirstSeenMap();
+          const videoIndexMap = new Map(
+            Array.from(videoFirstMap.entries())
+              .sort((a, b) => a[1] - b[1])
+              .map(([videoId], idx) => [videoId, idx])
+          );
+          const authorVideoRows = getAuthorVideoFirstSeenRows(
+            out.map((r) => r.author)
+          );
+          const authorVideoMap = new Map();
+          for (const row of authorVideoRows) {
+            if (!row || !row.author || !row.video_id) continue;
+            const idx = videoIndexMap.get(row.video_id);
+            if (idx == null) continue;
+            const list = authorVideoMap.get(row.author) || [];
+            list.push({
+              videoId: row.video_id,
+              index: idx,
+              firstTs: Number(row.first_ts) || 0,
+            });
+            authorVideoMap.set(row.author, list);
+          }
+          for (const list of authorVideoMap.values()) {
+            list.sort((a, b) => a.index - b.index);
+          }
+          const withMeta = out.map((r) => {
+            const ts = Number(r.timestamp_ms) || 0;
+            const isFirst =
+              !!r.author && ts === (authorMap.get(r.author) || 0);
+            let lastStreamFirstTs = null;
+            let lastStreamAgo = null;
+            const currentIndex = r.video_id
+              ? videoIndexMap.get(r.video_id)
+              : null;
+            if (!isFirst && currentIndex != null && r.author) {
+              const list = authorVideoMap.get(r.author) || [];
+              for (let i = list.length - 1; i >= 0; i -= 1) {
+                const entry = list[i];
+                if (entry.index < currentIndex) {
+                  lastStreamFirstTs = entry.firstTs || null;
+                  lastStreamAgo = currentIndex - entry.index;
+                  break;
+                }
+              }
+            }
+            return {
+              ...r,
+              is_first_time: isFirst,
+              last_stream_first_ts: lastStreamFirstTs,
+              last_stream_ago: lastStreamAgo,
+            };
+          });
+          return res.json(withMeta);
       }
     } catch (e) {
       console.warn("getRecentComments error:", e?.message || e);
@@ -533,7 +589,61 @@ function createOverlayServer() {
       const key = `${r.timestamp_ms || 0}_${r.author || ""}_${r.text || ""}`;
       if (!uniq.has(key)) uniq.set(key, r);
     }
-    res.json(Array.from(uniq.values()));
+    const fallbackRows = Array.from(uniq.values());
+    const authorMap = getAuthorFirstSeenMap(fallbackRows.map((r) => r.author));
+    const videoFirstMap = getVideoFirstSeenMap();
+    const videoIndexMap = new Map(
+      Array.from(videoFirstMap.entries())
+        .sort((a, b) => a[1] - b[1])
+        .map(([videoId], idx) => [videoId, idx])
+    );
+    const authorVideoRows = getAuthorVideoFirstSeenRows(
+      fallbackRows.map((r) => r.author)
+    );
+    const authorVideoMap = new Map();
+    for (const row of authorVideoRows) {
+      if (!row || !row.author || !row.video_id) continue;
+      const idx = videoIndexMap.get(row.video_id);
+      if (idx == null) continue;
+      const list = authorVideoMap.get(row.author) || [];
+      list.push({
+        videoId: row.video_id,
+        index: idx,
+        firstTs: Number(row.first_ts) || 0,
+      });
+      authorVideoMap.set(row.author, list);
+    }
+    for (const list of authorVideoMap.values()) {
+      list.sort((a, b) => a.index - b.index);
+    }
+    const withMeta = fallbackRows.map((r) => {
+      const ts = Number(r.timestamp_ms) || 0;
+      const isFirst =
+        !!r.author && ts === (authorMap.get(r.author) || 0);
+      let lastStreamFirstTs = null;
+      let lastStreamAgo = null;
+      const currentIndex = r.video_id
+        ? videoIndexMap.get(r.video_id)
+        : null;
+      if (!isFirst && currentIndex != null && r.author) {
+        const list = authorVideoMap.get(r.author) || [];
+        for (let i = list.length - 1; i >= 0; i -= 1) {
+          const entry = list[i];
+          if (entry.index < currentIndex) {
+            lastStreamFirstTs = entry.firstTs || null;
+            lastStreamAgo = currentIndex - entry.index;
+            break;
+          }
+        }
+      }
+      return {
+        ...r,
+        is_first_time: isFirst,
+        last_stream_first_ts: lastStreamFirstTs,
+        last_stream_ago: lastStreamAgo,
+      };
+    });
+    res.json(withMeta);
   });
 
   // エフェクト手動トリガー API
