@@ -388,7 +388,7 @@ function getVideoFirstSeenMap() {
       .prepare(
         `SELECT video_id, MIN(timestamp_ms) AS first_ts
          FROM comments
-         WHERE video_id IS NOT NULL AND video_id != ""
+         WHERE video_id IS NOT NULL AND video_id != ''
          GROUP BY video_id`
       )
       .all();
@@ -417,7 +417,7 @@ function getAuthorVideoFirstSeenRows(authors) {
         `SELECT author, video_id, MIN(timestamp_ms) AS first_ts
          FROM comments
          WHERE author IN (${placeholders})
-           AND video_id IS NOT NULL AND video_id != ""
+           AND video_id IS NOT NULL AND video_id != ''
          GROUP BY author, video_id`
       )
       .all(...list);
