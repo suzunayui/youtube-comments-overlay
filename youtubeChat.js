@@ -137,7 +137,7 @@ function extractContinuationData(cont0) {
       const block = cont0[k];
       return {
         continuation: block.continuation,
-        timeoutMs: block.timeoutMs ?? 2000,
+        timeoutMs: block.timeoutMs ?? 1000,
       };
     }
   }
