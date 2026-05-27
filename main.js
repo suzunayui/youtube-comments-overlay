@@ -1,6 +1,5 @@
 // main.js
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
-const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
@@ -28,10 +27,6 @@ const {
 
 let mainWindow = null;
 let boundsSaveTimer = null;
-let virtualCamWindow = null;
-let virtualCamProcess = null;
-let virtualCamStatus = "stopped";
-let virtualCamCmdRunning = false;
 let currentColors = {
   overlay: {
     fontFamily: "Noto Sans JP",
@@ -80,6 +75,8 @@ let currentColors = {
   }
 };
 const effectTriggers = [];
+const participantsByVideo = new Map();
+const PARTICIPANT_KEYWORD = "参加希望";
 
 // ==============================
 // 同時接続数の監視（Playwright で watch ページを読む）
@@ -295,6 +292,117 @@ function isWindowAlive() {
   return mainWindow && !mainWindow.isDestroyed();
 }
 
+function participantVideoKey(videoId) {
+  return videoId || "default";
+}
+
+function participantAuthorKey(msg) {
+  const author = typeof msg?.author === "string" ? msg.author.trim() : "";
+  return author || `anonymous:${msg?.id || msg?.timestamp_ms || Date.now()}`;
+}
+
+function getParticipantBucket(videoId) {
+  const key = participantVideoKey(videoId);
+  if (!participantsByVideo.has(key)) {
+    participantsByVideo.set(key, new Map());
+  }
+  return participantsByVideo.get(key);
+}
+
+function participantStatePath() {
+  return path.join(app.getPath("userData"), "participants-state.json");
+}
+
+function saveParticipantState() {
+  if (!app.isReady()) return;
+  try {
+    const data = {};
+    for (const [videoId, bucket] of participantsByVideo.entries()) {
+      data[videoId] = Array.from(bucket.values());
+    }
+    fs.writeFileSync(participantStatePath(), JSON.stringify(data), "utf8");
+  } catch (err) {
+    console.warn("saveParticipantState error:", err?.message || err);
+  }
+}
+
+function loadParticipantState() {
+  if (!app.isReady()) return;
+  try {
+    const filePath = participantStatePath();
+    if (!fs.existsSync(filePath)) return;
+    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    participantsByVideo.clear();
+    for (const [videoId, items] of Object.entries(data || {})) {
+      const bucket = getParticipantBucket(videoId);
+      for (const item of Array.isArray(items) ? items : []) {
+        if (!item || !item.author_key) continue;
+        bucket.set(item.author_key, item);
+      }
+    }
+  } catch (err) {
+    console.warn("loadParticipantState error:", err?.message || err);
+  }
+}
+
+function participantItems(videoId) {
+  return Array.from(getParticipantBucket(videoId).values())
+    .filter((item) => item.status !== "deleted")
+    .sort((a, b) => (a.accepted_ms || 0) - (b.accepted_ms || 0));
+}
+
+function upsertParticipantFromComment(msg) {
+  if (!msg || msg.kind !== "text") return false;
+  const text = typeof msg.text === "string" ? msg.text : "";
+  if (!text.includes(PARTICIPANT_KEYWORD)) return false;
+
+  const videoId = msg.video_id || "default";
+  const authorKey = participantAuthorKey(msg);
+  const bucket = getParticipantBucket(videoId);
+  if (bucket.has(authorKey)) return false;
+
+  bucket.set(authorKey, {
+    id: String(msg.id || `${msg.timestamp_ms || 0}_${msg.author || ""}_${text}`),
+    video_id: videoId,
+    author_key: authorKey,
+    author: msg.author || "(no name)",
+    icon: msg.icon || "",
+    text,
+    accepted_ms: Number(msg.timestamp_ms) || Date.now(),
+    status: "waiting",
+  });
+  saveParticipantState();
+  return true;
+}
+
+function syncParticipantsFromComments(rows) {
+  if (!Array.isArray(rows)) return;
+  for (const row of rows) {
+    upsertParticipantFromComment(row);
+  }
+}
+
+function latestVideoIdFromRows(rows) {
+  let latest = null;
+  for (const row of rows || []) {
+    if (!row || !row.video_id) continue;
+    const ts = Number(row.timestamp_ms) || 0;
+    if (!latest || ts > latest.ts) latest = { id: row.video_id, ts };
+  }
+  return latest ? latest.id : null;
+}
+
+function latestParticipantVideoId() {
+  let latest = null;
+  for (const [videoId, bucket] of participantsByVideo.entries()) {
+    for (const item of bucket.values()) {
+      const ts = Number(item.accepted_ms) || 0;
+      if (!latest || ts > latest.ts) latest = { id: videoId, ts };
+    }
+  }
+  return latest ? latest.id : null;
+}
+
 /**
  * オーバーレイ用 HTTP サーバ (http://127.0.0.1:5000/...) を起動
  */
@@ -314,6 +422,10 @@ function createOverlayServer() {
 
   srv.get("/supers", (req, res) => {
     res.sendFile(path.join(__dirname, "supers.html"));
+  });
+
+  srv.get("/participants", (req, res) => {
+    res.sendFile(path.join(__dirname, "participants.html"));
   });
 
   srv.get(["/concurrent", "/overlay/concurrent"], (req, res) => {
@@ -496,6 +608,72 @@ function createOverlayServer() {
     res.json({ ok: true, state: st });
   });
 
+  srv.get("/api/participants", async (req, res) => {
+    let videoId = typeof req.query.videoId === "string" ? req.query.videoId : "";
+    try {
+      const rows = await getRecentComments(500);
+      syncParticipantsFromComments(rows);
+      if (!videoId) {
+        videoId = latestVideoIdFromRows(rows) || latestParticipantVideoId() || "default";
+      }
+    } catch (e) {
+      console.warn("participants sync error:", e?.message || e);
+      if (!videoId) videoId = latestParticipantVideoId() || "default";
+    }
+    res.json({
+      ok: true,
+      videoId,
+      keyword: PARTICIPANT_KEYWORD,
+      items: participantItems(videoId),
+    });
+  });
+
+  srv.post("/api/participants/status", express.json(), (req, res) => {
+    const videoId = req.body?.videoId || "default";
+    const authorKey = String(req.body?.authorKey || "");
+    const status = req.body?.status === "done" ? "done" : "waiting";
+    const item = getParticipantBucket(videoId).get(authorKey);
+    if (!item) return res.status(404).json({ ok: false, error: "not found" });
+    item.status = status;
+    item.updated_ms = Date.now();
+    saveParticipantState();
+    res.json({ ok: true, item });
+  });
+
+  srv.post("/api/participants/delete", express.json(), (req, res) => {
+    const videoId = req.body?.videoId || "default";
+    const authorKey = String(req.body?.authorKey || "");
+    const bucket = getParticipantBucket(videoId);
+    const item = bucket.get(authorKey);
+    if (item) {
+      item.status = "deleted";
+      item.updated_ms = Date.now();
+      saveParticipantState();
+    }
+    res.json({ ok: true });
+  });
+
+  srv.post("/api/participants/clear", express.json(), (req, res) => {
+    const videoId = req.body?.videoId || "default";
+    const mode = req.body?.mode === "done" ? "done" : "all";
+    const bucket = getParticipantBucket(videoId);
+    if (mode === "done") {
+      for (const item of bucket.values()) {
+        if (item.status === "done") {
+          item.status = "deleted";
+          item.updated_ms = Date.now();
+        }
+      }
+    } else {
+      for (const item of bucket.values()) {
+        item.status = "deleted";
+        item.updated_ms = Date.now();
+      }
+    }
+    saveParticipantState();
+    res.json({ ok: true, items: participantItems(videoId) });
+  });
+
   srv.get("/comments", async (req, res) => {
     const limit = parseInt(req.query.limit, 10);
     const after = parseInt(req.query.after, 10);
@@ -573,6 +751,7 @@ function createOverlayServer() {
               last_stream_ago: lastStreamAgo,
             };
           });
+          syncParticipantsFromComments(withMeta);
           return res.json(withMeta);
       }
     } catch (e) {
@@ -643,6 +822,7 @@ function createOverlayServer() {
         last_stream_ago: lastStreamAgo,
       };
     });
+    syncParticipantsFromComments(withMeta);
     res.json(withMeta);
   });
 
@@ -741,6 +921,7 @@ function createObsLauncherFiles() {
   makeLauncher("overlay-launcher.html", "http://127.0.0.1:5000/");
   makeLauncher("niconico-launcher.html", "http://127.0.0.1:5000/niconico");
   makeLauncher("supers-launcher.html", "http://127.0.0.1:5000/supers");
+  makeLauncher("participants-launcher.html", "http://127.0.0.1:5000/participants");
   makeLauncher("concurrent-launcher.html", "http://127.0.0.1:5000/concurrent");
   makeLauncher("effects-launcher.html", "http://127.0.0.1:5000/effects");
   makeLauncher("underrpg-launcher.html", "http://127.0.0.1:5000/rpgoverlay");
@@ -827,95 +1008,6 @@ function createMainWindow(launchersDir) {
   });
 }
 
-function createVirtualCamWindow({ width, height }) {
-  if (virtualCamWindow && !virtualCamWindow.isDestroyed()) {
-    return virtualCamWindow;
-  }
-  virtualCamWindow = new BrowserWindow({
-    width,
-    height,
-    resizable: false,
-    movable: true,
-    minimizable: true,
-    maximizable: false,
-    autoHideMenuBar: true,
-    title: "YouTube Chat Overlay VirtualCam",
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-  virtualCamWindow.loadURL("http://127.0.0.1:5000/");
-  virtualCamWindow.on("closed", () => {
-    virtualCamWindow = null;
-  });
-  return virtualCamWindow;
-}
-
-function stopVirtualCam() {
-  if (virtualCamProcess) {
-    try {
-      virtualCamProcess.kill("SIGTERM");
-    } catch (_) {}
-    virtualCamProcess = null;
-  }
-  if (virtualCamWindow && !virtualCamWindow.isDestroyed()) {
-    virtualCamWindow.close();
-  }
-  virtualCamStatus = "stopped";
-  if (isWindowAlive()) {
-    mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
-  }
-}
-
-function startVirtualCam(opts) {
-  if (virtualCamProcess) return;
-  const width = Math.max(320, parseInt(opts.width, 10) || 1280);
-  const height = Math.max(240, parseInt(opts.height, 10) || 720);
-  const fps = Math.max(5, Math.min(60, parseInt(opts.fps, 10) || 30));
-  const deviceName = String(opts.device || "Unity Video Capture");
-
-  const win = createVirtualCamWindow({ width, height });
-  const title = win.getTitle();
-  const args = [
-    "-f", "gdigrab",
-    "-framerate", String(fps),
-    "-i", `title=${title}`,
-    "-vf", `scale=${width}:${height}`,
-    "-pix_fmt", "yuv420p",
-    "-f", "dshow",
-    `video=${deviceName}`,
-  ];
-
-  virtualCamStatus = "starting";
-  if (isWindowAlive()) {
-    mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
-  }
-
-  virtualCamProcess = spawn("ffmpeg", args, { windowsHide: true });
-  virtualCamProcess.on("error", (err) => {
-    virtualCamStatus = "error: " + (err?.message || String(err));
-    if (isWindowAlive()) {
-      mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
-    }
-    stopVirtualCam();
-  });
-  virtualCamProcess.on("exit", () => {
-    if (virtualCamProcess) {
-      virtualCamProcess = null;
-    }
-    virtualCamStatus = "stopped";
-    if (isWindowAlive()) {
-      mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
-    }
-  });
-
-  virtualCamStatus = "running";
-  if (isWindowAlive()) {
-    mainWindow.webContents.send("virtualcam:status", virtualCamStatus);
-  }
-}
-
 // ==============================
 // IPC: 開始 / 停止
 // ==============================
@@ -970,71 +1062,6 @@ ipcMain.on("launchers:open", () => {
   shell.openPath(dir);
 });
 
-ipcMain.on("virtualcam:start", (_event, opts) => {
-  startVirtualCam(opts || {});
-});
-
-ipcMain.on("virtualcam:stop", () => {
-  stopVirtualCam();
-});
-
-function runVirtualCamCli(args, onDone) {
-  if (virtualCamCmdRunning) {
-    onDone({ ok: false, code: -1, output: "already running" });
-    return;
-  }
-  virtualCamCmdRunning = true;
-  const projPath = path.join(__dirname, "youtube-overlay-virtualcam");
-  const cmdArgs = ["run", "--project", projPath, "--", ...args];
-  const proc = spawn("dotnet", cmdArgs, { windowsHide: true });
-  let output = "";
-  proc.stdout.on("data", (d) => {
-    output += d.toString();
-  });
-  proc.stderr.on("data", (d) => {
-    output += d.toString();
-  });
-  proc.on("close", (code) => {
-    virtualCamCmdRunning = false;
-    onDone({ ok: code === 0, code: code ?? -1, output });
-  });
-  proc.on("error", (err) => {
-    virtualCamCmdRunning = false;
-    onDone({ ok: false, code: -1, output: err?.message || String(err) });
-  });
-}
-
-ipcMain.on("virtualcam:register", (_event, opts) => {
-  const name = String(opts?.name || "YouTube Overlay VirtualCam");
-  const source = String(opts?.source || "youtube-overlay-virtualcam");
-  const lifetime = String(opts?.lifetime || "system");
-  const access = String(opts?.access || "all");
-  runVirtualCamCli(
-    ["register", "--name", name, "--source", source, "--lifetime", lifetime, "--access", access],
-    (result) => {
-      if (isWindowAlive()) {
-        mainWindow.webContents.send("virtualcam:register:result", result);
-      }
-    }
-  );
-});
-
-ipcMain.on("virtualcam:unregister", (_event, opts) => {
-  const name = String(opts?.name || "YouTube Overlay VirtualCam");
-  const source = String(opts?.source || "youtube-overlay-virtualcam");
-  const lifetime = String(opts?.lifetime || "system");
-  const access = String(opts?.access || "all");
-  runVirtualCamCli(
-    ["unregister", "--name", name, "--source", source, "--lifetime", lifetime, "--access", access],
-    (result) => {
-      if (isWindowAlive()) {
-        mainWindow.webContents.send("virtualcam:register:result", result);
-      }
-    }
-  );
-});
-
-
 // カラー設定の更新
 ipcMain.on("colors:update", (_event, settings) => {
   if (settings.overlay) {
@@ -1056,6 +1083,7 @@ ipcMain.on("colors:update", (_event, settings) => {
 app.whenReady().then(() => {
   const chatDbPath = initChatStore(app.getPath("userData"));
   console.log("SQLite chat DB:", chatDbPath);
+  loadParticipantState();
 
   createOverlayServer();
 

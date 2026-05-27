@@ -111,54 +111,6 @@
     font-size: 10px;
   }
 
-  #virtualCamBox {
-    margin-top: 10px;
-    padding: 8px;
-    border-radius: 6px;
-    background: #25253a;
-    font-size: 10px;
-  }
-
-  #virtualCamBox input[type="text"],
-  #virtualCamBox input[type="number"] {
-    width: 100%;
-    padding: 4px 6px;
-    margin-top: 4px;
-    border-radius: 4px;
-    border: 1px solid #555;
-    background: #2a2a3d;
-    color: #f5f5f5;
-    box-sizing: border-box;
-    font-size: 11px;
-  }
-
-  #virtualCamBox button {
-    margin-top: 6px;
-    padding: 5px 8px;
-    font-size: 11px;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    background: #3f51b5;
-    color: #fff;
-  }
-
-  #virtualCamBox button.secondary {
-    background: #5a5a6e;
-  }
-
-  #virtualCamBox select {
-    width: 100%;
-    padding: 4px 6px;
-    margin-top: 4px;
-    border-radius: 4px;
-    border: 1px solid #555;
-    background: #2a2a3d;
-    color: #f5f5f5;
-    box-sizing: border-box;
-    font-size: 11px;
-  }
-
   #launchersBox code {
     background: #333;
     padding: 1px 3px;
@@ -558,6 +510,59 @@
     color: #d8deff;
   }
 
+  .participant-rank {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #2a2a44;
+    color: #e7e9ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    flex: 0 0 auto;
+  }
+
+  .participant-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+  }
+
+  .participant-actions button {
+    padding: 3px 6px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    background: #3f51b5;
+    color: #fff;
+  }
+
+  .participant-actions button.secondary {
+    background: #5a5a6e;
+  }
+
+  .participant-actions button.danger {
+    background: #b53f4b;
+  }
+
+  .list-item.done {
+    opacity: 0.55;
+  }
+
+  .item-badge.participant-status {
+    background: #51411d;
+    color: #ffe7a3;
+  }
+
+  .item-badge.participant-status.done {
+    background: #264b37;
+    color: #d8ffe6;
+  }
+
   @keyframes blinkNew {
     0%, 100% { background: rgba(255, 211, 64, 0.35); box-shadow: 0 0 0 1px rgba(255, 211, 64, 0.6); }
     50% { background: transparent; box-shadow: none; }
@@ -590,33 +595,6 @@
         </div>
       </div>
 
-      <div id="virtualCamBox">
-        <div>仮想カメラ登録 (Media Foundation)</div>
-        <label>表示名
-          <input type="text" id="mfCamName" value="YouTube Overlay VirtualCam" />
-        </label>
-        <label>ソースID
-          <input type="text" id="mfCamSource" value="youtube-overlay-virtualcam" />
-        </label>
-        <label>ライフタイム
-          <select id="mfCamLifetime">
-            <option value="system">system (全体)</option>
-            <option value="session">session (一時)</option>
-          </select>
-        </label>
-        <label>アクセス
-          <select id="mfCamAccess">
-            <option value="all">all (全ユーザー)</option>
-            <option value="current">current (現ユーザー)</option>
-          </select>
-        </label>
-        <button id="btnMfRegister">登録</button>
-        <button id="btnMfUnregister" class="secondary">解除</button>
-        <div class="small" id="mfCamStatus">状態: 未実行</div>
-        <pre class="small" id="mfCamLog" style="white-space: pre-wrap; margin: 6px 0 0;"></pre>
-        <div class="small">※管理者権限が必要な場合があります</div>
-      </div>
-
       <div class="tab-bar" id="mainTabs">
         <button class="tab-btn active" data-tab="settings">設定</button>
         <button class="tab-btn" data-tab="viewer">コメント閲覧</button>
@@ -624,6 +602,7 @@
 
       <div class="tab-bar" id="viewerTabs">
         <button class="tab-btn active" data-tab="comments">コメント</button>
+        <button class="tab-btn" data-tab="participants">参加管理</button>
         <button class="tab-btn" data-tab="supers">スパチャ読み</button>
       </div>
 
@@ -884,6 +863,18 @@
         </div>
         <div class="list-box" id="superList"></div>
       </div>
+
+      <div class="viewer-card hidden" id="viewerParticipantsCard">
+        <h2>参加型管理</h2>
+        <div class="viewer-controls">
+          <label><input type="checkbox" id="participantHideDone" checked /> 完了を隠す</label>
+          <button id="btnParticipantCopy">待機者をコピー</button>
+          <button id="btnParticipantClearDone" class="secondary">完了を削除</button>
+          <button id="btnParticipantClearAll" class="secondary">全削除</button>
+          <span id="participantCount" class="small"></span>
+        </div>
+        <div class="list-box" id="participantList"></div>
+      </div>
       </div>
     </div>
   </div>
@@ -899,14 +890,6 @@
 
   const launchersPathEl = document.getElementById("launchersPath");
   const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
-  const mfCamName = document.getElementById("mfCamName");
-  const mfCamSource = document.getElementById("mfCamSource");
-  const mfCamLifetime = document.getElementById("mfCamLifetime");
-  const mfCamAccess = document.getElementById("mfCamAccess");
-  const btnMfRegister = document.getElementById("btnMfRegister");
-  const btnMfUnregister = document.getElementById("btnMfUnregister");
-  const mfCamStatus = document.getElementById("mfCamStatus");
-  const mfCamLog = document.getElementById("mfCamLog");
   const effectStatus = document.getElementById("effectStatus");
   const KEY = "yt-overlay-input";
   const EFFECT_ENDPOINT = "http://127.0.0.1:5000/trigger-effect";
@@ -919,6 +902,7 @@
   const viewerPanel = document.getElementById("viewerPanel");
   const viewerCommentsCard = document.getElementById("viewerCommentsCard");
   const viewerSupersCard = document.getElementById("viewerSupersCard");
+  const viewerParticipantsCard = document.getElementById("viewerParticipantsCard");
   const settingsCols = settingsPanel ? settingsPanel.querySelectorAll(".settings-col") : [];
   const overlayCol = settingsCols[0] || null;
   const nicoCol = settingsCols[1] || null;
@@ -971,6 +955,7 @@
     function showViewerTab(name) {
       if (viewerCommentsCard) viewerCommentsCard.classList.toggle("hidden", name !== "comments");
       if (viewerSupersCard) viewerSupersCard.classList.toggle("hidden", name !== "supers");
+      if (viewerParticipantsCard) viewerParticipantsCard.classList.toggle("hidden", name !== "participants");
       setActiveTab(viewerTabs, name);
       localStorage.setItem("yt-overlay-viewer-tab", name);
     }
@@ -993,14 +978,6 @@
     showViewerTab(viewerTabSaved);
     showMainTab(mainTabSaved);
 
-    const mfName = localStorage.getItem("yt-overlay-mf-name");
-    const mfSource = localStorage.getItem("yt-overlay-mf-source");
-    const mfLifetime = localStorage.getItem("yt-overlay-mf-lifetime");
-    const mfAccess = localStorage.getItem("yt-overlay-mf-access");
-    if (mfName && mfCamName) mfCamName.value = mfName;
-    if (mfSource && mfCamSource) mfCamSource.value = mfSource;
-    if (mfLifetime && mfCamLifetime) mfCamLifetime.value = mfLifetime;
-    if (mfAccess && mfCamAccess) mfCamAccess.value = mfAccess;
   });
 
   btnStart.addEventListener("click", () => {
@@ -1043,54 +1020,6 @@
 
   btnOpenLaunchers.addEventListener("click", () => {
     ipcRenderer.send("launchers:open");
-  });
-
-  function saveMfSettings() {
-    if (mfCamName) localStorage.setItem("yt-overlay-mf-name", mfCamName.value.trim());
-    if (mfCamSource) localStorage.setItem("yt-overlay-mf-source", mfCamSource.value.trim());
-    if (mfCamLifetime) localStorage.setItem("yt-overlay-mf-lifetime", mfCamLifetime.value);
-    if (mfCamAccess) localStorage.setItem("yt-overlay-mf-access", mfCamAccess.value);
-  }
-
-  function mfPayload() {
-    return {
-      name: mfCamName ? mfCamName.value.trim() : "YouTube Overlay VirtualCam",
-      source: mfCamSource ? mfCamSource.value.trim() : "youtube-overlay-virtualcam",
-      lifetime: mfCamLifetime ? mfCamLifetime.value : "system",
-      access: mfCamAccess ? mfCamAccess.value : "all",
-    };
-  }
-
-  if (btnMfRegister) {
-    btnMfRegister.addEventListener("click", () => {
-      saveMfSettings();
-      if (mfCamStatus) mfCamStatus.textContent = "状態: 登録中...";
-      ipcRenderer.send("virtualcam:register", mfPayload());
-    });
-  }
-
-  if (btnMfUnregister) {
-    btnMfUnregister.addEventListener("click", () => {
-      saveMfSettings();
-      if (mfCamStatus) mfCamStatus.textContent = "状態: 解除中...";
-      ipcRenderer.send("virtualcam:unregister", mfPayload());
-    });
-  }
-
-  ipcRenderer.on("virtualcam:register:result", (_event, result) => {
-    if (!mfCamStatus) return;
-    const ok = result && result.ok;
-    const code = result ? result.code : "";
-    const output = result ? result.output : "";
-    const lines = output ? output.trim().split(/\r?\n/) : [];
-    const tail = lines.slice(-10).join("\n");
-    mfCamStatus.textContent = ok
-      ? "状態: 完了"
-      : `状態: 失敗 (code=${code})`;
-    if (mfCamLog) {
-      mfCamLog.textContent = tail || "";
-    }
-    if (output) console.log("virtualcam cli:", output);
   });
 
   // エフェクト手動トリガー
@@ -1469,7 +1398,10 @@
 
   // ========== コメントビュー / スパチャ読み ==========
   const COMMENTS_ENDPOINT = "http://127.0.0.1:5000/comments";
+  const PARTICIPANT_ENDPOINT = "http://127.0.0.1:5000/api/participants";
   const SUPER_READ_KEY = "yt-overlay-super-read";
+  const PARTICIPANT_KEY = "yt-overlay-participants";
+  const PARTICIPANT_KEYWORD = "参加希望";
 
   const commentFilter = document.getElementById("commentFilter");
   const commentPause = document.getElementById("commentPause");
@@ -1479,6 +1411,12 @@
   const btnSuperMarkAll = document.getElementById("btnSuperMarkAll");
   const btnSuperCopy = document.getElementById("btnSuperCopy");
   const superCount = document.getElementById("superCount");
+  const participantList = document.getElementById("participantList");
+  const participantHideDone = document.getElementById("participantHideDone");
+  const btnParticipantCopy = document.getElementById("btnParticipantCopy");
+  const btnParticipantClearDone = document.getElementById("btnParticipantClearDone");
+  const btnParticipantClearAll = document.getElementById("btnParticipantClearAll");
+  const participantCount = document.getElementById("participantCount");
 
   const commentStore = new Map();
   const highlightStartById = new Map();
@@ -1486,6 +1424,7 @@
   let lastAfterMs = 0;
   let currentVideoId = null;
   let superReadMap = {};
+  let participantMap = {};
 
   const superKinds = new Set([
     "paid",
@@ -1496,6 +1435,10 @@
   ]);
 
   function currentReadKey() {
+    return currentVideoId || "default";
+  }
+
+  function currentParticipantKey() {
     return currentVideoId || "default";
   }
 
@@ -1528,6 +1471,110 @@
   function isRead(id) {
     const key = currentReadKey();
     return !!(superReadMap[key] && superReadMap[key][id]);
+  }
+
+  async function refreshParticipantMapFromServer() {
+    const params = new URLSearchParams();
+    if (currentVideoId) params.set("videoId", currentVideoId);
+    const res = await fetch(`${PARTICIPANT_ENDPOINT}?${params.toString()}`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data || !Array.isArray(data.items)) return false;
+    if (data.videoId) currentVideoId = data.videoId;
+    const key = currentParticipantKey();
+    participantMap[key] = {};
+    for (const item of data.items) {
+      if (!item || !item.author_key) continue;
+      participantMap[key][item.author_key] = item;
+    }
+    saveParticipantMap();
+    return true;
+  }
+
+  async function loadParticipantMap() {
+    try {
+      const raw = localStorage.getItem(PARTICIPANT_KEY);
+      participantMap = raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      participantMap = {};
+    }
+    const key = currentParticipantKey();
+    if (!participantMap[key]) participantMap[key] = {};
+    try {
+      await refreshParticipantMapFromServer();
+    } catch (_) {}
+  }
+
+  function saveParticipantMap() {
+    localStorage.setItem(PARTICIPANT_KEY, JSON.stringify(participantMap));
+  }
+
+  function participantAuthorKey(msg) {
+    return (msg.author || "").trim() || `anonymous:${buildId(msg)}`;
+  }
+
+  function participantsForCurrentVideo() {
+    const key = currentParticipantKey();
+    if (!participantMap[key]) participantMap[key] = {};
+    return participantMap[key];
+  }
+
+  function participantItems() {
+    return Object.values(participantsForCurrentVideo()).sort(
+      (a, b) => (a.accepted_ms || 0) - (b.accepted_ms || 0)
+    );
+  }
+
+  function upsertParticipant(msg) {
+    if (!msg || msg.kind !== "text") return false;
+    const body = textFromMsg(msg);
+    if (!body.includes(PARTICIPANT_KEYWORD)) return false;
+    const authorKey = participantAuthorKey(msg);
+    const current = participantsForCurrentVideo();
+    if (current[authorKey]) return false;
+    current[authorKey] = {
+      id: buildId(msg),
+      author_key: authorKey,
+      author: msg.author || "(no name)",
+      icon: msg.icon || "",
+      text: body,
+      accepted_ms: Number(msg.timestamp_ms) || Date.now(),
+      status: "waiting",
+    };
+    saveParticipantMap();
+    return true;
+  }
+
+  async function setParticipantStatus(authorKey, status) {
+    const current = participantsForCurrentVideo();
+    if (current[authorKey]) {
+      current[authorKey].status = status;
+      current[authorKey].updated_ms = Date.now();
+      saveParticipantMap();
+    }
+    await fetch(`${PARTICIPANT_ENDPOINT}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        videoId: currentParticipantKey(),
+        authorKey,
+        status,
+      }),
+    });
+  }
+
+  async function deleteParticipant(authorKey) {
+    const current = participantsForCurrentVideo();
+    delete current[authorKey];
+    saveParticipantMap();
+    await fetch(`${PARTICIPANT_ENDPOINT}/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        videoId: currentParticipantKey(),
+        authorKey,
+      }),
+    });
   }
 
   function findLatestVideoId(data) {
@@ -1871,6 +1918,80 @@
     superCount.textContent = `未読: ${unreadCount}`;
   }
 
+  async function renderParticipants() {
+    try {
+      await refreshParticipantMapFromServer();
+    } catch (_) {}
+    const hideDone = participantHideDone.checked;
+    const items = participantItems();
+    const waitingItems = items.filter((item) => item.status !== "done");
+    const visibleItems = hideDone ? waitingItems : items;
+
+    participantList.innerHTML = "";
+    visibleItems.forEach((entry) => {
+      const rank = waitingItems.findIndex((item) => item.author_key === entry.author_key) + 1;
+      const item = document.createElement("div");
+      item.className = "list-item" + (entry.status === "done" ? " done" : " unread");
+
+      const num = document.createElement("div");
+      num.className = "participant-rank";
+      num.textContent = entry.status === "done" ? "-" : String(rank);
+
+      const avatar = document.createElement("div");
+      avatar.className = "chat-avatar";
+      if (entry.icon) {
+        const img = document.createElement("img");
+        img.src = entry.icon;
+        img.alt = entry.author || "";
+        avatar.appendChild(img);
+      }
+
+      const content = document.createElement("div");
+      content.className = "chat-content";
+
+      const header = document.createElement("div");
+      header.className = "chat-header";
+      const time = document.createElement("span");
+      time.className = "chat-time";
+      time.textContent = formatTime(entry.accepted_ms);
+      const author = document.createElement("span");
+      author.className = "item-author";
+      author.textContent = entry.author || "(no name)";
+      const status = document.createElement("span");
+      status.className = "item-badge participant-status" + (entry.status === "done" ? " done" : "");
+      status.textContent = entry.status === "done" ? "完了" : "待機";
+      header.append(time, author, status);
+
+      const text = document.createElement("div");
+      text.className = "item-text";
+      text.textContent = entry.text || PARTICIPANT_KEYWORD;
+
+      const actions = document.createElement("div");
+      actions.className = "participant-actions";
+      const doneBtn = document.createElement("button");
+      doneBtn.textContent = entry.status === "done" ? "待機に戻す" : "完了";
+      doneBtn.className = entry.status === "done" ? "secondary" : "";
+      doneBtn.addEventListener("click", async () => {
+        await setParticipantStatus(entry.author_key, entry.status === "done" ? "waiting" : "done");
+        await renderParticipants();
+      });
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "削除";
+      deleteBtn.className = "danger";
+      deleteBtn.addEventListener("click", async () => {
+        await deleteParticipant(entry.author_key);
+        await renderParticipants();
+      });
+      actions.append(doneBtn, deleteBtn);
+
+      content.append(header, text, actions);
+      item.append(num, avatar, content);
+      participantList.appendChild(item);
+    });
+
+    participantCount.textContent = `待機: ${waitingItems.length} / 合計: ${items.length}`;
+  }
+
   async function fetchCommentsOnce(forceFull = false) {
     const params = new URLSearchParams();
     params.set("limit", "200");
@@ -1891,6 +2012,7 @@
         initialLoaded = false;
         lastAfterMs = 0;
         loadReadMap();
+        await loadParticipantMap();
         await fetchCommentsOnce(true);
         return;
       }
@@ -1903,6 +2025,7 @@
         const id = buildId(msg);
         if (!commentStore.has(id)) {
           commentStore.set(id, msg);
+          upsertParticipant(msg);
           if (initialLoaded) {
             highlightStartById.set(id, Date.now());
           }
@@ -1917,6 +2040,7 @@
       trimStore();
       renderComments();
       renderSupers();
+      renderParticipants();
     } catch (e) {
       console.error("fetchCommentsOnce error", e);
     }
@@ -1925,6 +2049,7 @@
   commentFilter.addEventListener("input", renderComments);
   commentPause.addEventListener("change", renderComments);
   superUnreadOnly.addEventListener("change", renderSupers);
+  participantHideDone.addEventListener("change", renderParticipants);
   btnSuperMarkAll.addEventListener("click", () => {
     const key = currentReadKey();
     if (!superReadMap[key]) superReadMap[key] = {};
@@ -1955,8 +2080,46 @@
       console.error("copy failed", e);
     }
   });
+  btnParticipantCopy.addEventListener("click", async () => {
+    try {
+      await refreshParticipantMapFromServer();
+    } catch (_) {}
+    const lines = participantItems()
+      .filter((item) => item.status !== "done")
+      .map((item, idx) => `${idx + 1}. ${item.author}`);
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      participantCount.textContent = `待機: ${lines.length} (コピー済み)`;
+    } catch (e) {
+      console.error("copy failed", e);
+    }
+  });
+  btnParticipantClearDone.addEventListener("click", async () => {
+    const current = participantsForCurrentVideo();
+    for (const item of Object.values(current)) {
+      if (item.status === "done") delete current[item.author_key];
+    }
+    saveParticipantMap();
+    await fetch(`${PARTICIPANT_ENDPOINT}/clear`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId: currentParticipantKey(), mode: "done" }),
+    });
+    await renderParticipants();
+  });
+  btnParticipantClearAll.addEventListener("click", async () => {
+    participantMap[currentParticipantKey()] = {};
+    saveParticipantMap();
+    await fetch(`${PARTICIPANT_ENDPOINT}/clear`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId: currentParticipantKey(), mode: "all" }),
+    });
+    await renderParticipants();
+  });
 
   loadReadMap();
+  loadParticipantMap();
   setInterval(fetchCommentsOnce, 1000);
   fetchCommentsOnce(true);
 </script>
