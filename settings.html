@@ -55,7 +55,9 @@
     font-size: 13px;
   }
 
-  input[type="text"] {
+  input[type="text"],
+  input[type="password"],
+  input[type="number"] {
     width: 100%;
     padding: 6px 8px;
     margin-top: 4px;
@@ -103,29 +105,67 @@
     margin-top: 6px;
   }
 
-  #launchersBox {
+  #obsBox {
     margin-top: 10px;
-    padding: 6px;
+    padding: 8px;
     border-radius: 6px;
     background: #25253a;
-    font-size: 10px;
+    font-size: 11px;
   }
 
-  #launchersBox code {
-    background: #333;
-    padding: 1px 3px;
-    border-radius: 3px;
+  #obsBox label {
+    margin-top: 6px;
   }
 
-  #btnOpenLaunchers {
-    margin-top: 4px;
-    padding: 3px 6px;
-    font-size: 10px;
+  .obs-inline {
+    display: flex;
+    gap: 6px;
+  }
+
+  .obs-inline label {
+    flex: 1;
+  }
+
+  #obsBox button {
+    margin-top: 8px;
+    padding: 4px 6px;
+    font-size: 11px;
     border-radius: 4px;
-    border: none;
-    cursor: pointer;
     background: #3f51b5;
     color: #fff;
+  }
+
+  #obsStatus {
+    margin-top: 6px;
+    color: #cdd0ff;
+    line-height: 1.35;
+  }
+
+  .obs-source-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .obs-source-grid label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 6px;
+    border-radius: 6px;
+    background: #1f1f32;
+  }
+
+  .obs-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .obs-actions button {
+    flex: 1 1 140px;
   }
 
   .color-settings {
@@ -563,6 +603,57 @@
     color: #d8ffe6;
   }
 
+  .ohayo-summary {
+    display: grid;
+    grid-template-columns: minmax(120px, 180px) 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .ohayo-count-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px;
+    border-radius: 8px;
+    background: #111722;
+    border: 1px solid #35415a;
+  }
+
+  .ohayo-label {
+    color: #cdd0ff;
+    font-size: 12px;
+  }
+
+  .ohayo-count {
+    margin-top: 4px;
+    font-size: 44px;
+    line-height: 1;
+    font-weight: 800;
+    color: #8ef0ff;
+  }
+
+  .ohayo-breakdown {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    color: #dfe2ff;
+    font-size: 12px;
+  }
+
+  .ohayo-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .ohayo-actions button {
+    flex: 0 0 auto;
+    min-width: 54px;
+    padding: 6px 10px;
+  }
+
   @keyframes blinkNew {
     0%, 100% { background: rgba(255, 211, 64, 0.35); box-shadow: 0 0 0 1px rgba(255, 211, 64, 0.6); }
     50% { background: transparent; box-shadow: none; }
@@ -587,14 +678,6 @@
     <div id="status">ステータス: 停止中</div>
 
     <div class="tab-column">
-      <div id="launchersBox">
-        <div id="launchersPath">OBS 用ランチャーフォルダ: 準備中…</div>
-        <button id="btnOpenLaunchers">フォルダを開く（ドラッグ用）</button>
-        <div class="small">
-          フォルダ内の <code>*.html</code> を OBS にドラッグ＆ドロップ
-        </div>
-      </div>
-
       <div class="tab-bar" id="mainTabs">
         <button class="tab-btn active" data-tab="settings">設定</button>
         <button class="tab-btn" data-tab="viewer">コメント閲覧</button>
@@ -603,6 +686,7 @@
       <div class="tab-bar" id="viewerTabs">
         <button class="tab-btn active" data-tab="comments">コメント</button>
         <button class="tab-btn" data-tab="participants">参加管理</button>
+        <button class="tab-btn" data-tab="ohayo">おはよう</button>
         <button class="tab-btn" data-tab="supers">スパチャ読み</button>
       </div>
 
@@ -611,6 +695,7 @@
         <button class="tab-btn" data-tab="nico">ニコニコ</button>
         <button class="tab-btn" data-tab="supers">Supers</button>
         <button class="tab-btn" data-tab="effects">エフェクト</button>
+        <button class="tab-btn" data-tab="obs">OBS設定</button>
       </div>
     </div>
 
@@ -842,6 +927,46 @@
           <div id="effectStatus">クリックでエフェクトを送信できます。</div>
         </div>
       </div>
+
+      <div class="settings-col hidden" id="obsSettingsCol">
+        <div class="color-settings" id="obsBox">
+          <h2>OBS設定</h2>
+          <div class="color-row">
+            <label>開始時に再読み込み</label>
+            <input type="checkbox" id="obsEnabled" />
+          </div>
+          <div class="obs-inline">
+            <label>
+              ホスト
+              <input type="text" id="obsHost" value="127.0.0.1" />
+            </label>
+            <label>
+              ポート
+              <input type="number" id="obsPort" value="4455" min="1" max="65535" />
+            </label>
+          </div>
+          <label>
+            パスワード
+            <input type="password" id="obsPassword" autocomplete="current-password" />
+          </label>
+          <label>
+            再読み込み対象ソース名（カンマ区切り / 空ならブラウザソース全部）
+            <input type="text" id="obsSources" placeholder="YT Overlay - Comments, YT Overlay - Ohayo" />
+          </label>
+          <div class="color-category">現在のOBSシーンへ追加するHTML</div>
+          <div class="obs-source-grid">
+            <label><input type="checkbox" class="obs-source-item" value="overlay" checked /> 通常コメント</label>
+            <label><input type="checkbox" class="obs-source-item" value="niconico" checked /> ニコニコ風</label>
+            <label><input type="checkbox" class="obs-source-item" value="participants" checked /> 参加管理</label>
+            <label><input type="checkbox" class="obs-source-item" value="ohayo" checked /> おはよう</label>
+          </div>
+          <div class="obs-actions">
+            <button id="btnObsAddSources">現在シーンへHTML追加</button>
+            <button id="btnObsTest" class="secondary">接続・再読み込みテスト</button>
+          </div>
+          <div id="obsStatus">OBS連携: 未接続</div>
+        </div>
+      </div>
     </div>
 
       <div class="viewer-row hidden" id="viewerPanel">
@@ -875,6 +1000,26 @@
         </div>
         <div class="list-box" id="participantList"></div>
       </div>
+
+      <div class="viewer-card hidden" id="viewerOhayoCard">
+        <h2>おはようカウンター</h2>
+        <div class="ohayo-summary">
+          <div class="ohayo-count-box">
+            <div class="ohayo-label">現在の人数</div>
+            <div class="ohayo-count" id="ohayoCount">0</div>
+          </div>
+          <div class="ohayo-breakdown">
+            <div id="ohayoBreakdown">自動: 0 / 手動: 0</div>
+            <div class="ohayo-actions">
+              <button id="btnOhayoMinus" class="secondary">-1</button>
+              <button id="btnOhayoPlus">+1</button>
+              <button id="btnOhayoReset" class="secondary">リセット</button>
+            </div>
+            <div class="small" id="ohayoStatus">コメントに「おは」を含むユーザーを1人1回だけ数えます。</div>
+          </div>
+        </div>
+        <div class="list-box" id="ohayoList"></div>
+      </div>
       </div>
     </div>
   </div>
@@ -887,9 +1032,16 @@
   const btnStart = document.getElementById("btnStart");
   const btnStop = document.getElementById("btnStop");
   const statusEl = document.getElementById("status");
+  const obsEnabled = document.getElementById("obsEnabled");
+  const obsHost = document.getElementById("obsHost");
+  const obsPort = document.getElementById("obsPort");
+  const obsPassword = document.getElementById("obsPassword");
+  const obsSources = document.getElementById("obsSources");
+  const obsSourceItems = document.querySelectorAll(".obs-source-item");
+  const btnObsAddSources = document.getElementById("btnObsAddSources");
+  const btnObsTest = document.getElementById("btnObsTest");
+  const obsStatus = document.getElementById("obsStatus");
 
-  const launchersPathEl = document.getElementById("launchersPath");
-  const btnOpenLaunchers = document.getElementById("btnOpenLaunchers");
   const effectStatus = document.getElementById("effectStatus");
   const KEY = "yt-overlay-input";
   const EFFECT_ENDPOINT = "http://127.0.0.1:5000/trigger-effect";
@@ -903,10 +1055,12 @@
   const viewerCommentsCard = document.getElementById("viewerCommentsCard");
   const viewerSupersCard = document.getElementById("viewerSupersCard");
   const viewerParticipantsCard = document.getElementById("viewerParticipantsCard");
+  const viewerOhayoCard = document.getElementById("viewerOhayoCard");
   const settingsCols = settingsPanel ? settingsPanel.querySelectorAll(".settings-col") : [];
   const overlayCol = settingsCols[0] || null;
   const nicoCol = settingsCols[1] || null;
   const supersCol = settingsCols[2] || null;
+  const obsCol = document.getElementById("obsSettingsCol");
   const supersBox = supersCol ? supersCol.querySelector(".color-settings") : null;
   const effectsBox = supersCol ? supersCol.querySelector(".effect-box") : null;
 
@@ -946,6 +1100,7 @@
       if (overlayCol) overlayCol.classList.toggle("hidden", name !== "overlay");
       if (nicoCol) nicoCol.classList.toggle("hidden", name !== "nico");
       if (supersCol) supersCol.classList.toggle("hidden", name !== "supers" && name !== "effects");
+      if (obsCol) obsCol.classList.toggle("hidden", name !== "obs");
       if (supersBox) supersBox.classList.toggle("hidden", name !== "supers");
       if (effectsBox) effectsBox.classList.toggle("hidden", name !== "effects");
       setActiveTab(settingsTabs, name);
@@ -956,6 +1111,7 @@
       if (viewerCommentsCard) viewerCommentsCard.classList.toggle("hidden", name !== "comments");
       if (viewerSupersCard) viewerSupersCard.classList.toggle("hidden", name !== "supers");
       if (viewerParticipantsCard) viewerParticipantsCard.classList.toggle("hidden", name !== "participants");
+      if (viewerOhayoCard) viewerOhayoCard.classList.toggle("hidden", name !== "ohayo");
       setActiveTab(viewerTabs, name);
       localStorage.setItem("yt-overlay-viewer-tab", name);
     }
@@ -978,6 +1134,94 @@
     showViewerTab(viewerTabSaved);
     showMainTab(mainTabSaved);
 
+    loadObsSettings();
+
+  });
+
+  function readObsSettings() {
+    return {
+      enabled: obsEnabled.checked,
+      host: obsHost.value.trim() || "127.0.0.1",
+      port: parseInt(obsPort.value, 10) || 4455,
+      password: obsPassword.value,
+      sources: obsSources.value.trim(),
+      items: Array.from(obsSourceItems)
+        .filter((el) => el.checked)
+        .map((el) => el.value),
+    };
+  }
+
+  function applyObsSettings(settings) {
+    const s = settings || {};
+    obsEnabled.checked = s.enabled === true;
+    obsHost.value = s.host || "127.0.0.1";
+    obsPort.value = String(s.port || 4455);
+    obsPassword.value = s.password || "";
+    obsSources.value = s.sources || "";
+    const selected = new Set(Array.isArray(s.items) ? s.items : ["overlay", "niconico", "participants", "ohayo"]);
+    obsSourceItems.forEach((el) => {
+      el.checked = selected.has(el.value);
+    });
+  }
+
+  async function loadObsSettings() {
+    try {
+      const settings = await ipcRenderer.invoke("obs:get-settings");
+      applyObsSettings(settings);
+    } catch (e) {
+      obsStatus.textContent = "OBS連携: 設定読み込みエラー";
+      console.error("load OBS settings failed", e);
+    }
+  }
+
+  async function saveObsSettings() {
+    try {
+      await ipcRenderer.invoke("obs:save-settings", readObsSettings());
+    } catch (e) {
+      console.error("save OBS settings failed", e);
+    }
+  }
+
+  [obsEnabled, obsHost, obsPort, obsPassword, obsSources, ...obsSourceItems].forEach((el) => {
+    el.addEventListener("change", saveObsSettings);
+    el.addEventListener("input", saveObsSettings);
+  });
+
+  btnObsAddSources.addEventListener("click", async () => {
+    obsStatus.textContent = "OBS連携: HTML追加中…";
+    try {
+      const result = await ipcRenderer.invoke("obs:add-sources", readObsSettings());
+      if (!result || result.ok === false) {
+        obsStatus.textContent = "OBS連携: エラー: " + (result?.error || "追加できませんでした");
+        return;
+      }
+      const added = Array.isArray(result.added) ? result.added.length : 0;
+      const updated = Array.isArray(result.updated) ? result.updated.length : 0;
+      const failed = Array.isArray(result.failed) ? result.failed.length : 0;
+      obsStatus.textContent = failed > 0
+        ? `OBS連携: ${result.sceneName || "現在シーン"} に追加 ${added} / 更新 ${updated} / 失敗 ${failed}`
+        : `OBS連携: ${result.sceneName || "現在シーン"} に追加 ${added} / 更新 ${updated}`;
+    } catch (e) {
+      obsStatus.textContent = "OBS連携: エラー: " + (e?.message || e);
+    }
+  });
+
+  btnObsTest.addEventListener("click", async () => {
+    obsStatus.textContent = "OBS連携: 接続テスト中…";
+    try {
+      const result = await ipcRenderer.invoke("obs:test", readObsSettings());
+      if (!result || result.ok === false) {
+        obsStatus.textContent = "OBS連携: エラー: " + (result?.error || "接続できませんでした");
+        return;
+      }
+      const count = Array.isArray(result.refreshed) ? result.refreshed.length : 0;
+      const failed = Array.isArray(result.failed) ? result.failed.length : 0;
+      obsStatus.textContent = failed > 0
+        ? `OBS連携: ${count}件成功 / ${failed}件失敗`
+        : `OBS連携: ${count}件再読み込みしました`;
+    } catch (e) {
+      obsStatus.textContent = "OBS連携: エラー: " + (e?.message || e);
+    }
   });
 
   btnStart.addEventListener("click", () => {
@@ -990,7 +1234,7 @@
     localStorage.setItem(KEY, v);
 
     statusEl.textContent = "ステータス: 起動中…";
-    ipcRenderer.send("chat:start", v);
+    ipcRenderer.send("chat:start", { input: v, obs: readObsSettings() });
   });
 
   btnStop.addEventListener("click", () => {
@@ -1013,13 +1257,8 @@
     statusEl.textContent = "ステータス: エラー: " + message;
   });
 
-  // ランチャーフォルダのパス表示
-  ipcRenderer.on("launchers:path", (_event, dirPath) => {
-    launchersPathEl.textContent = "OBS 用ランチャーフォルダ: " + dirPath;
-  });
-
-  btnOpenLaunchers.addEventListener("click", () => {
-    ipcRenderer.send("launchers:open");
+  ipcRenderer.on("obs:status", (_event, message) => {
+    obsStatus.textContent = "OBS連携: " + message;
   });
 
   // エフェクト手動トリガー
@@ -1399,6 +1638,7 @@
   // ========== コメントビュー / スパチャ読み ==========
   const COMMENTS_ENDPOINT = "http://127.0.0.1:5000/comments";
   const PARTICIPANT_ENDPOINT = "http://127.0.0.1:5000/api/participants";
+  const OHAYO_ENDPOINT = "http://127.0.0.1:5000/api/ohayo";
   const SUPER_READ_KEY = "yt-overlay-super-read";
   const PARTICIPANT_KEY = "yt-overlay-participants";
   const PARTICIPANT_KEYWORD = "参加希望";
@@ -1417,6 +1657,13 @@
   const btnParticipantClearDone = document.getElementById("btnParticipantClearDone");
   const btnParticipantClearAll = document.getElementById("btnParticipantClearAll");
   const participantCount = document.getElementById("participantCount");
+  const ohayoCount = document.getElementById("ohayoCount");
+  const ohayoBreakdown = document.getElementById("ohayoBreakdown");
+  const ohayoStatus = document.getElementById("ohayoStatus");
+  const ohayoList = document.getElementById("ohayoList");
+  const btnOhayoMinus = document.getElementById("btnOhayoMinus");
+  const btnOhayoPlus = document.getElementById("btnOhayoPlus");
+  const btnOhayoReset = document.getElementById("btnOhayoReset");
 
   const commentStore = new Map();
   const highlightStartById = new Map();
@@ -1425,6 +1672,7 @@
   let currentVideoId = null;
   let superReadMap = {};
   let participantMap = {};
+  let ohayoState = { count: 0, detected: 0, adjustment: 0, entries: [] };
 
   const superKinds = new Set([
     "paid",
@@ -1485,6 +1733,7 @@
     participantMap[key] = {};
     for (const item of data.items) {
       if (!item || !item.author_key) continue;
+      if (!item.author_id) item.author_id = item.author_key;
       participantMap[key][item.author_key] = item;
     }
     saveParticipantMap();
@@ -1529,12 +1778,21 @@
     if (!msg || msg.kind !== "text") return false;
     const body = textFromMsg(msg);
     if (!body.includes(PARTICIPANT_KEYWORD)) return false;
-    const authorKey = participantAuthorKey(msg);
+    const authorId = participantAuthorKey(msg);
+    const id = buildId(msg);
+    const requestKey = `${authorId}::${id}`;
     const current = participantsForCurrentVideo();
-    if (current[authorKey]) return false;
-    current[authorKey] = {
-      id: buildId(msg),
-      author_key: authorKey,
+    if (current[requestKey]) return false;
+    for (const item of Object.values(current)) {
+      const itemAuthorId = item.author_id || item.author_key;
+      if (itemAuthorId === authorId && item.status === "waiting") {
+        return false;
+      }
+    }
+    current[requestKey] = {
+      id,
+      author_key: requestKey,
+      author_id: authorId,
       author: msg.author || "(no name)",
       icon: msg.icon || "",
       text: body,
@@ -1992,6 +2250,109 @@
     participantCount.textContent = `待機: ${waitingItems.length} / 合計: ${items.length}`;
   }
 
+  async function refreshOhayoState() {
+    const params = new URLSearchParams();
+    if (currentVideoId) params.set("videoId", currentVideoId);
+    const suffix = params.toString();
+    const res = await fetch(suffix ? `${OHAYO_ENDPOINT}?${suffix}` : OHAYO_ENDPOINT);
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data || data.ok === false) return false;
+    ohayoState = data;
+    if (data.videoId) currentVideoId = data.videoId;
+    return true;
+  }
+
+  function renderOhayo() {
+    const count = Number(ohayoState.count) || 0;
+    const detected = Number(ohayoState.detected) || 0;
+    const adjustment = Number(ohayoState.adjustment) || 0;
+    ohayoCount.textContent = String(count);
+    ohayoBreakdown.textContent = `自動: ${detected} / 手動: ${adjustment >= 0 ? "+" : ""}${adjustment}`;
+    ohayoList.innerHTML = "";
+
+    const entries = Array.isArray(ohayoState.entries) ? ohayoState.entries : [];
+    for (const entry of entries) {
+      const item = document.createElement("div");
+      item.className = "list-item unread";
+
+      const avatar = document.createElement("div");
+      avatar.className = "chat-avatar";
+      if (entry.icon) {
+        const img = document.createElement("img");
+        img.src = entry.icon;
+        img.alt = entry.author || "";
+        avatar.appendChild(img);
+      }
+
+      const content = document.createElement("div");
+      content.className = "chat-content";
+
+      const header = document.createElement("div");
+      header.className = "chat-header";
+      const time = document.createElement("span");
+      time.className = "chat-time";
+      time.textContent = formatTime(entry.accepted_ms);
+      const author = document.createElement("span");
+      author.className = "item-author";
+      author.textContent = entry.author || "(no name)";
+      const badge = document.createElement("span");
+      badge.className = "item-badge";
+      badge.textContent = "おは";
+      header.append(time, author, badge);
+
+      const text = document.createElement("div");
+      text.className = "item-text";
+      text.textContent = entry.text || "";
+
+      content.append(header, text);
+      item.append(avatar, content);
+      ohayoList.appendChild(item);
+    }
+  }
+
+  async function updateOhayo() {
+    try {
+      await refreshOhayoState();
+      renderOhayo();
+    } catch (e) {
+      console.error("ohayo update error", e);
+    }
+  }
+
+  async function adjustOhayo(delta) {
+    try {
+      const res = await fetch(`${OHAYO_ENDPOINT}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: currentVideoId || "default", delta }),
+      });
+      if (res.ok) {
+        ohayoState = await res.json();
+        renderOhayo();
+      }
+    } catch (e) {
+      console.error("ohayo adjust error", e);
+    }
+  }
+
+  async function resetOhayo() {
+    try {
+      const res = await fetch(`${OHAYO_ENDPOINT}/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: currentVideoId || "default" }),
+      });
+      if (res.ok) {
+        ohayoState = await res.json();
+        renderOhayo();
+        ohayoStatus.textContent = "リセットしました。";
+      }
+    } catch (e) {
+      console.error("ohayo reset error", e);
+    }
+  }
+
   async function fetchCommentsOnce(forceFull = false) {
     const params = new URLSearchParams();
     params.set("limit", "200");
@@ -2041,6 +2402,7 @@
       renderComments();
       renderSupers();
       renderParticipants();
+      updateOhayo();
     } catch (e) {
       console.error("fetchCommentsOnce error", e);
     }
@@ -2050,6 +2412,9 @@
   commentPause.addEventListener("change", renderComments);
   superUnreadOnly.addEventListener("change", renderSupers);
   participantHideDone.addEventListener("change", renderParticipants);
+  btnOhayoMinus.addEventListener("click", () => adjustOhayo(-1));
+  btnOhayoPlus.addEventListener("click", () => adjustOhayo(1));
+  btnOhayoReset.addEventListener("click", resetOhayo);
   btnSuperMarkAll.addEventListener("click", () => {
     const key = currentReadKey();
     if (!superReadMap[key]) superReadMap[key] = {};
@@ -2120,6 +2485,7 @@
 
   loadReadMap();
   loadParticipantMap();
+  updateOhayo();
   setInterval(fetchCommentsOnce, 1000);
   fetchCommentsOnce(true);
 </script>

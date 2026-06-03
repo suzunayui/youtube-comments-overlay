@@ -5,6 +5,7 @@ const fs = require("fs");
 const express = require("express");
 const http = require("http");
 const { chromium } = require("playwright");
+const OBSWebSocket = require("obs-websocket-js").default;
 const {
   initChatStore,
   closeChatStore,
@@ -76,7 +77,51 @@ let currentColors = {
 };
 const effectTriggers = [];
 const participantsByVideo = new Map();
+const ohayoByVideo = new Map();
 const PARTICIPANT_KEYWORD = "参加希望";
+const OHAYO_KEYWORD = "おは";
+const DEFAULT_OBS_SETTINGS = {
+  enabled: false,
+  host: "127.0.0.1",
+  port: 4455,
+  password: "",
+  sources: "",
+  items: ["overlay", "niconico", "participants", "ohayo"],
+};
+const OBS_BROWSER_SOURCE_DEFS = [
+  {
+    id: "overlay",
+    label: "通常コメント",
+    inputName: "YT Overlay - Comments",
+    url: "http://127.0.0.1:5000/",
+    width: 800,
+    height: 600,
+  },
+  {
+    id: "niconico",
+    label: "ニコニコ風",
+    inputName: "YT Overlay - Niconico",
+    url: "http://127.0.0.1:5000/niconico",
+    width: 1920,
+    height: 1080,
+  },
+  {
+    id: "participants",
+    label: "参加管理",
+    inputName: "YT Overlay - Participants",
+    url: "http://127.0.0.1:5000/participants",
+    width: 520,
+    height: 720,
+  },
+  {
+    id: "ohayo",
+    label: "おはよう",
+    inputName: "YT Overlay - Ohayo",
+    url: "http://127.0.0.1:5000/ohayo",
+    width: 420,
+    height: 140,
+  },
+];
 
 // ==============================
 // 同時接続数の監視（Playwright で watch ページを読む）
@@ -292,11 +337,189 @@ function isWindowAlive() {
   return mainWindow && !mainWindow.isDestroyed();
 }
 
+function obsSettingsPath() {
+  return path.join(app.getPath("userData"), "obs-settings.json");
+}
+
+function normalizeObsSettings(raw = {}) {
+  const port = parseInt(raw.port, 10);
+  const knownIds = new Set(OBS_BROWSER_SOURCE_DEFS.map((item) => item.id));
+  const items = Array.isArray(raw.items)
+    ? raw.items.filter((id) => knownIds.has(id))
+    : DEFAULT_OBS_SETTINGS.items;
+  return {
+    enabled: raw.enabled === true,
+    host: String(raw.host || DEFAULT_OBS_SETTINGS.host).trim() || DEFAULT_OBS_SETTINGS.host,
+    port: Number.isFinite(port) && port > 0 ? port : DEFAULT_OBS_SETTINGS.port,
+    password: String(raw.password || ""),
+    sources: String(raw.sources || ""),
+    items: items.length > 0 ? items : DEFAULT_OBS_SETTINGS.items,
+  };
+}
+
+function loadObsSettings() {
+  if (!app.isReady()) return { ...DEFAULT_OBS_SETTINGS };
+  try {
+    const filePath = obsSettingsPath();
+    if (!fs.existsSync(filePath)) return { ...DEFAULT_OBS_SETTINGS };
+    return normalizeObsSettings(JSON.parse(fs.readFileSync(filePath, "utf8")));
+  } catch (err) {
+    console.warn("loadObsSettings error:", err?.message || err);
+    return { ...DEFAULT_OBS_SETTINGS };
+  }
+}
+
+function saveObsSettings(settings) {
+  const normalized = normalizeObsSettings(settings);
+  if (!app.isReady()) return normalized;
+  try {
+    fs.writeFileSync(obsSettingsPath(), JSON.stringify(normalized), "utf8");
+  } catch (err) {
+    console.warn("saveObsSettings error:", err?.message || err);
+  }
+  return normalized;
+}
+
+function obsSourceNames(settings) {
+  return String(settings.sources || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function refreshObsBrowserSources(settingsInput, { force = false } = {}) {
+  const settings = normalizeObsSettings(settingsInput);
+  if (!force && !settings.enabled) {
+    return { ok: true, skipped: true, message: "OBS連携はオフです" };
+  }
+
+  const obs = new OBSWebSocket();
+  const address = `ws://${settings.host}:${settings.port}`;
+  try {
+    await obs.connect(address, settings.password || undefined);
+
+    let targets = obsSourceNames(settings);
+    if (targets.length === 0) {
+      const inputList = await obs.call("GetInputList", { inputKind: "browser_source" });
+      targets = (inputList.inputs || []).map((input) => input.inputName).filter(Boolean);
+    }
+
+    const refreshed = [];
+    const failed = [];
+    for (const inputName of targets) {
+      try {
+        await obs.call("PressInputPropertiesButton", {
+          inputName,
+          propertyName: "refreshnocache",
+        });
+        refreshed.push(inputName);
+      } catch (err) {
+        failed.push({ inputName, error: err?.message || String(err) });
+      }
+    }
+
+    return { ok: failed.length === 0, refreshed, failed };
+  } finally {
+    try {
+      await obs.disconnect();
+    } catch (_) {}
+  }
+}
+
+function obsInputSettingsFor(def) {
+  return {
+    url: def.url,
+    width: def.width,
+    height: def.height,
+    is_local_file: false,
+    shutdown: false,
+    restart_when_active: true,
+  };
+}
+
+async function addObsBrowserSources(settingsInput) {
+  const settings = normalizeObsSettings(settingsInput);
+  const obs = new OBSWebSocket();
+  const address = `ws://${settings.host}:${settings.port}`;
+  try {
+    await obs.connect(address, settings.password || undefined);
+
+    const currentScene = await obs.call("GetCurrentProgramScene");
+    const sceneName = currentScene.currentProgramSceneName;
+    if (!sceneName) {
+      throw new Error("現在のOBSシーンを取得できませんでした");
+    }
+
+    const selected = new Set(settings.items);
+    const defs = OBS_BROWSER_SOURCE_DEFS.filter((def) => selected.has(def.id));
+    const inputList = await obs.call("GetInputList", { inputKind: "browser_source" });
+    const existingInputs = new Set((inputList.inputs || []).map((input) => input.inputName));
+
+    const added = [];
+    const updated = [];
+    const failed = [];
+
+    for (const def of defs) {
+      try {
+        const inputSettings = obsInputSettingsFor(def);
+        if (existingInputs.has(def.inputName)) {
+          await obs.call("SetInputSettings", {
+            inputName: def.inputName,
+            inputSettings,
+            overlay: true,
+          });
+          try {
+            await obs.call("GetSceneItemId", {
+              sceneName,
+              sourceName: def.inputName,
+            });
+          } catch (_) {
+            await obs.call("CreateSceneItem", {
+              sceneName,
+              sourceName: def.inputName,
+              sceneItemEnabled: true,
+            });
+          }
+          updated.push(def.inputName);
+        } else {
+          await obs.call("CreateInput", {
+            sceneName,
+            inputName: def.inputName,
+            inputKind: "browser_source",
+            inputSettings,
+            sceneItemEnabled: true,
+          });
+          existingInputs.add(def.inputName);
+          added.push(def.inputName);
+        }
+
+        await obs.call("PressInputPropertiesButton", {
+          inputName: def.inputName,
+          propertyName: "refreshnocache",
+        });
+      } catch (err) {
+        failed.push({ inputName: def.inputName, error: err?.message || String(err) });
+      }
+    }
+
+    return { ok: failed.length === 0, sceneName, added, updated, failed };
+  } finally {
+    try {
+      await obs.disconnect();
+    } catch (_) {}
+  }
+}
+
 function participantVideoKey(videoId) {
   return videoId || "default";
 }
 
 function participantAuthorKey(msg) {
+  const author = typeof msg?.author === "string" ? msg.author.trim() : "";
+  return author || `anonymous:${msg?.id || msg?.timestamp_ms || Date.now()}`;
+}
+
+function ohayoAuthorKey(msg) {
   const author = typeof msg?.author === "string" ? msg.author.trim() : "";
   return author || `anonymous:${msg?.id || msg?.timestamp_ms || Date.now()}`;
 }
@@ -307,6 +530,14 @@ function getParticipantBucket(videoId) {
     participantsByVideo.set(key, new Map());
   }
   return participantsByVideo.get(key);
+}
+
+function getOhayoState(videoId) {
+  const key = participantVideoKey(videoId);
+  if (!ohayoByVideo.has(key)) {
+    ohayoByVideo.set(key, { entries: new Map(), adjustment: 0, resetMs: 0 });
+  }
+  return ohayoByVideo.get(key);
 }
 
 function participantStatePath() {
@@ -337,11 +568,54 @@ function loadParticipantState() {
       const bucket = getParticipantBucket(videoId);
       for (const item of Array.isArray(items) ? items : []) {
         if (!item || !item.author_key) continue;
+        if (!item.author_id) item.author_id = item.author_key;
         bucket.set(item.author_key, item);
       }
     }
   } catch (err) {
     console.warn("loadParticipantState error:", err?.message || err);
+  }
+}
+
+function ohayoStatePath() {
+  return path.join(app.getPath("userData"), "ohayo-state.json");
+}
+
+function saveOhayoState() {
+  if (!app.isReady()) return;
+  try {
+    const data = {};
+    for (const [videoId, state] of ohayoByVideo.entries()) {
+      data[videoId] = {
+        adjustment: Number(state.adjustment) || 0,
+        reset_ms: Number(state.resetMs) || 0,
+        entries: Array.from(state.entries.values()),
+      };
+    }
+    fs.writeFileSync(ohayoStatePath(), JSON.stringify(data), "utf8");
+  } catch (err) {
+    console.warn("saveOhayoState error:", err?.message || err);
+  }
+}
+
+function loadOhayoState() {
+  if (!app.isReady()) return;
+  try {
+    const filePath = ohayoStatePath();
+    if (!fs.existsSync(filePath)) return;
+    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    ohayoByVideo.clear();
+    for (const [videoId, rawState] of Object.entries(data || {})) {
+      const state = getOhayoState(videoId);
+      state.adjustment = Number(rawState?.adjustment) || 0;
+      state.resetMs = Number(rawState?.reset_ms) || 0;
+      for (const entry of Array.isArray(rawState?.entries) ? rawState.entries : []) {
+        if (!entry || !entry.author_key) continue;
+        state.entries.set(entry.author_key, entry);
+      }
+    }
+  } catch (err) {
+    console.warn("loadOhayoState error:", err?.message || err);
   }
 }
 
@@ -357,14 +631,23 @@ function upsertParticipantFromComment(msg) {
   if (!text.includes(PARTICIPANT_KEYWORD)) return false;
 
   const videoId = msg.video_id || "default";
-  const authorKey = participantAuthorKey(msg);
+  const authorId = participantAuthorKey(msg);
+  const id = String(msg.id || `${msg.timestamp_ms || 0}_${msg.author || ""}_${text}`);
+  const requestKey = `${authorId}::${id}`;
   const bucket = getParticipantBucket(videoId);
-  if (bucket.has(authorKey)) return false;
+  if (bucket.has(requestKey)) return false;
+  for (const item of bucket.values()) {
+    const itemAuthorId = item.author_id || item.author_key;
+    if (itemAuthorId === authorId && item.status === "waiting") {
+      return false;
+    }
+  }
 
-  bucket.set(authorKey, {
-    id: String(msg.id || `${msg.timestamp_ms || 0}_${msg.author || ""}_${text}`),
+  bucket.set(requestKey, {
+    id,
     video_id: videoId,
-    author_key: authorKey,
+    author_key: requestKey,
+    author_id: authorId,
     author: msg.author || "(no name)",
     icon: msg.icon || "",
     text,
@@ -382,6 +665,56 @@ function syncParticipantsFromComments(rows) {
   }
 }
 
+function upsertOhayoFromComment(msg) {
+  if (!msg || msg.kind !== "text") return false;
+  const text = typeof msg.text === "string" ? msg.text : "";
+  if (!text.includes(OHAYO_KEYWORD)) return false;
+
+  const videoId = msg.video_id || "default";
+  const authorKey = ohayoAuthorKey(msg);
+  const state = getOhayoState(videoId);
+  const ts = Number(msg.timestamp_ms) || Date.now();
+  if (state.resetMs && ts <= state.resetMs) return false;
+  if (state.entries.has(authorKey)) return false;
+
+  state.entries.set(authorKey, {
+    id: String(msg.id || `${msg.timestamp_ms || 0}_${msg.author || ""}_${text}`),
+    video_id: videoId,
+    author_key: authorKey,
+    author: msg.author || "(no name)",
+    icon: msg.icon || "",
+    text,
+    accepted_ms: ts,
+  });
+  saveOhayoState();
+  return true;
+}
+
+function syncOhayoFromComments(rows) {
+  if (!Array.isArray(rows)) return;
+  for (const row of rows) {
+    upsertOhayoFromComment(row);
+  }
+}
+
+function ohayoPayload(videoId) {
+  const state = getOhayoState(videoId);
+  const detected = state.entries.size;
+  const adjustment = Number(state.adjustment) || 0;
+  return {
+    ok: true,
+    videoId: participantVideoKey(videoId),
+    keyword: OHAYO_KEYWORD,
+    detected,
+    adjustment,
+    reset_ms: Number(state.resetMs) || 0,
+    count: Math.max(0, detected + adjustment),
+    entries: Array.from(state.entries.values()).sort(
+      (a, b) => (a.accepted_ms || 0) - (b.accepted_ms || 0)
+    ),
+  };
+}
+
 function latestVideoIdFromRows(rows) {
   let latest = null;
   for (const row of rows || []) {
@@ -396,6 +729,17 @@ function latestParticipantVideoId() {
   let latest = null;
   for (const [videoId, bucket] of participantsByVideo.entries()) {
     for (const item of bucket.values()) {
+      const ts = Number(item.accepted_ms) || 0;
+      if (!latest || ts > latest.ts) latest = { id: videoId, ts };
+    }
+  }
+  return latest ? latest.id : null;
+}
+
+function latestOhayoVideoId() {
+  let latest = null;
+  for (const [videoId, state] of ohayoByVideo.entries()) {
+    for (const item of state.entries.values()) {
       const ts = Number(item.accepted_ms) || 0;
       if (!latest || ts > latest.ts) latest = { id: videoId, ts };
     }
@@ -426,6 +770,10 @@ function createOverlayServer() {
 
   srv.get("/participants", (req, res) => {
     res.sendFile(path.join(__dirname, "participants.html"));
+  });
+
+  srv.get("/ohayo", (req, res) => {
+    res.sendFile(path.join(__dirname, "ohayo.html"));
   });
 
   srv.get(["/concurrent", "/overlay/concurrent"], (req, res) => {
@@ -674,6 +1022,42 @@ function createOverlayServer() {
     res.json({ ok: true, items: participantItems(videoId) });
   });
 
+  srv.get("/api/ohayo", async (req, res) => {
+    let videoId = typeof req.query.videoId === "string" ? req.query.videoId : "";
+    try {
+      const rows = await getRecentComments(500);
+      syncOhayoFromComments(rows);
+      if (!videoId) {
+        videoId = latestVideoIdFromRows(rows) || latestOhayoVideoId() || "default";
+      }
+    } catch (e) {
+      console.warn("ohayo sync error:", e?.message || e);
+      if (!videoId) videoId = latestOhayoVideoId() || "default";
+    }
+    res.json(ohayoPayload(videoId));
+  });
+
+  srv.post("/api/ohayo/adjust", express.json(), (req, res) => {
+    const videoId = req.body?.videoId || "default";
+    const delta = parseInt(req.body?.delta, 10);
+    const state = getOhayoState(videoId);
+    state.adjustment += Number.isFinite(delta) ? delta : 0;
+    const minAdjustment = -state.entries.size;
+    if (state.adjustment < minAdjustment) state.adjustment = minAdjustment;
+    saveOhayoState();
+    res.json(ohayoPayload(videoId));
+  });
+
+  srv.post("/api/ohayo/reset", express.json(), (req, res) => {
+    const videoId = req.body?.videoId || "default";
+    const state = getOhayoState(videoId);
+    state.entries.clear();
+    state.adjustment = 0;
+    state.resetMs = Date.now();
+    saveOhayoState();
+    res.json(ohayoPayload(videoId));
+  });
+
   srv.get("/comments", async (req, res) => {
     const limit = parseInt(req.query.limit, 10);
     const after = parseInt(req.query.after, 10);
@@ -752,6 +1136,7 @@ function createOverlayServer() {
             };
           });
           syncParticipantsFromComments(withMeta);
+          syncOhayoFromComments(withMeta);
           return res.json(withMeta);
       }
     } catch (e) {
@@ -823,6 +1208,7 @@ function createOverlayServer() {
       };
     });
     syncParticipantsFromComments(withMeta);
+    syncOhayoFromComments(withMeta);
     res.json(withMeta);
   });
 
@@ -922,6 +1308,7 @@ function createObsLauncherFiles() {
   makeLauncher("niconico-launcher.html", "http://127.0.0.1:5000/niconico");
   makeLauncher("supers-launcher.html", "http://127.0.0.1:5000/supers");
   makeLauncher("participants-launcher.html", "http://127.0.0.1:5000/participants");
+  makeLauncher("ohayo-launcher.html", "http://127.0.0.1:5000/ohayo");
   makeLauncher("concurrent-launcher.html", "http://127.0.0.1:5000/concurrent");
   makeLauncher("effects-launcher.html", "http://127.0.0.1:5000/effects");
   makeLauncher("underrpg-launcher.html", "http://127.0.0.1:5000/rpgoverlay");
@@ -1013,12 +1400,37 @@ function createMainWindow(launchersDir) {
 // ==============================
 
 // チャット開始
-ipcMain.on("chat:start", (event, inputStr) => {
+ipcMain.on("chat:start", (event, payload) => {
+  const inputStr = typeof payload === "object" && payload !== null
+    ? String(payload.input || "")
+    : String(payload || "");
+  const obsSettings = typeof payload === "object" && payload !== null
+    ? saveObsSettings(payload.obs || {})
+    : loadObsSettings();
   console.log("IPC chat:start", inputStr);
 
   if (isWindowAlive()) {
     mainWindow.webContents.send("chat:status", "starting");
   }
+
+  refreshObsBrowserSources(obsSettings)
+    .then((result) => {
+      if (!isWindowAlive() || result.skipped) return;
+      const count = Array.isArray(result.refreshed) ? result.refreshed.length : 0;
+      const failed = Array.isArray(result.failed) ? result.failed.length : 0;
+      mainWindow.webContents.send(
+        "obs:status",
+        failed > 0
+          ? `OBS再読み込み: ${count}件成功 / ${failed}件失敗`
+          : `OBS再読み込み: ${count}件完了`
+      );
+    })
+    .catch((e) => {
+      console.warn("OBS refresh error:", e?.message || e);
+      if (isWindowAlive()) {
+        mainWindow.webContents.send("obs:status", "OBS再読み込みエラー: " + (e?.message || String(e)));
+      }
+    });
 
   startLiveChat(inputStr).catch((e) => {
     console.error("startLiveChat error:", e);
@@ -1043,6 +1455,33 @@ ipcMain.on("chat:start", (event, inputStr) => {
     .catch((e) => {
       console.warn("同接ウォッチ用 videoId 解決エラー:", e?.message || e);
     });
+});
+
+ipcMain.handle("obs:get-settings", () => {
+  return loadObsSettings();
+});
+
+ipcMain.handle("obs:save-settings", (_event, settings) => {
+  return saveObsSettings(settings || {});
+});
+
+ipcMain.handle("obs:test", async (_event, settings) => {
+  const saved = saveObsSettings(settings || {});
+  try {
+    const result = await refreshObsBrowserSources(saved, { force: true });
+    return { ok: true, ...result };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+});
+
+ipcMain.handle("obs:add-sources", async (_event, settings) => {
+  const saved = saveObsSettings(settings || {});
+  try {
+    return await addObsBrowserSources(saved);
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 });
 
 // チャット停止
@@ -1084,6 +1523,7 @@ app.whenReady().then(() => {
   const chatDbPath = initChatStore(app.getPath("userData"));
   console.log("SQLite chat DB:", chatDbPath);
   loadParticipantState();
+  loadOhayoState();
 
   createOverlayServer();
 
@@ -1102,12 +1542,14 @@ app.whenReady().then(() => {
 app.on("before-quit", () => {
   stopLiveChat();
   stopConcurrentWatcher();
+  saveOhayoState();
   closeChatStore();
 });
 
 app.on("window-all-closed", () => {
   stopLiveChat();
   stopConcurrentWatcher();
+  saveOhayoState();
   closeChatStore();
   if (process.platform !== "darwin") {
     app.quit();
