@@ -78,19 +78,6 @@
     box-sizing: border-box;
   }
 
-  .rank {
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
-    display: grid;
-    place-items: center;
-    background: var(--accent);
-    color: #181100;
-    font-weight: 700;
-    font-size: 16px;
-    flex: 0 0 auto;
-  }
-
   .avatar {
     width: 32px;
     height: 32px;
@@ -124,6 +111,44 @@
     text-align: center;
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
   }
+
+  body.layout-horizontal #wrap {
+    justify-content: center;
+  }
+
+  body.layout-horizontal #panel {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  body.layout-horizontal #title {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  body.layout-horizontal #list {
+    flex: 1 1 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  body.layout-horizontal #empty {
+    flex: 1 1 auto;
+    padding: 8px;
+  }
+
+  body.layout-horizontal .row {
+    flex: 0 1 auto;
+    max-width: 280px;
+  }
+
+  body.layout-horizontal .name {
+    max-width: 190px;
+  }
 </style>
 </head>
 <body>
@@ -139,15 +164,24 @@
 </div>
 
 <script>
+  const params = new URLSearchParams(location.search);
+  const layoutOverride = params.get("layout");
+  let horizontal = layoutOverride === "horizontal";
+  const requestedLimit = Number.parseInt(params.get("limit"), 10);
+  document.body.classList.toggle("layout-horizontal", horizontal);
+
   const list = document.getElementById("list");
   const count = document.getElementById("count");
   const empty = document.getElementById("empty");
 
   function normalizeItems(items) {
+    const itemLimit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : (horizontal ? 20 : 10);
     return (Array.isArray(items) ? items : [])
       .filter((item) => item && item.status !== "done")
       .sort((a, b) => (a.accepted_ms || 0) - (b.accepted_ms || 0))
-      .slice(0, 10);
+      .slice(0, itemLimit);
   }
 
   function render(items) {
@@ -156,13 +190,9 @@
     count.textContent = String(waiting.length);
     empty.style.display = waiting.length ? "none" : "block";
 
-    waiting.forEach((item, idx) => {
+    waiting.forEach((item) => {
       const row = document.createElement("div");
       row.className = "row";
-
-      const rank = document.createElement("div");
-      rank.className = "rank";
-      rank.textContent = String(idx + 1);
 
       const avatar = document.createElement("div");
       avatar.className = "avatar";
@@ -177,7 +207,7 @@
       name.className = "name";
       name.textContent = item.author || "(no name)";
 
-      row.append(rank, avatar, name);
+      row.append(avatar, name);
       list.appendChild(row);
     });
   }

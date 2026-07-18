@@ -564,6 +564,18 @@
     flex: 0 0 auto;
   }
 
+  .participant-draggable {
+    cursor: grab;
+  }
+
+  .participant-draggable:active {
+    cursor: grabbing;
+  }
+
+  .participant-dragging {
+    opacity: 0.35;
+  }
+
   .participant-actions {
     display: flex;
     gap: 6px;
@@ -687,14 +699,11 @@
         <button class="tab-btn active" data-tab="comments">コメント</button>
         <button class="tab-btn" data-tab="participants">参加管理</button>
         <button class="tab-btn" data-tab="ohayo">おはよう</button>
-        <button class="tab-btn" data-tab="supers">スパチャ読み</button>
       </div>
 
       <div class="tab-bar" id="settingsTabs">
         <button class="tab-btn active" data-tab="overlay">通常</button>
         <button class="tab-btn" data-tab="nico">ニコニコ</button>
-        <button class="tab-btn" data-tab="supers">Supers</button>
-        <button class="tab-btn" data-tab="effects">エフェクト</button>
         <button class="tab-btn" data-tab="obs">OBS設定</button>
       </div>
     </div>
@@ -957,7 +966,8 @@
           <div class="obs-source-grid">
             <label><input type="checkbox" class="obs-source-item" value="overlay" checked /> 通常コメント</label>
             <label><input type="checkbox" class="obs-source-item" value="niconico" checked /> ニコニコ風</label>
-            <label><input type="checkbox" class="obs-source-item" value="participants" checked /> 参加管理</label>
+            <label><input type="checkbox" class="obs-source-item" value="participantsVertical" checked /> 参加管理（縦並び）</label>
+            <label><input type="checkbox" class="obs-source-item" value="participantsHorizontal" checked /> 参加管理（横並び）</label>
             <label><input type="checkbox" class="obs-source-item" value="ohayo" checked /> おはよう</label>
           </div>
           <div class="obs-actions">
@@ -1071,8 +1081,14 @@
     }
 
     const mainTabSaved = localStorage.getItem("yt-overlay-main-tab") || "settings";
-    const settingsTabSaved = localStorage.getItem("yt-overlay-settings-tab") || "overlay";
-    const viewerTabSaved = localStorage.getItem("yt-overlay-viewer-tab") || "comments";
+    const settingsTabSavedRaw = localStorage.getItem("yt-overlay-settings-tab") || "overlay";
+    const viewerTabSavedRaw = localStorage.getItem("yt-overlay-viewer-tab") || "comments";
+    const settingsTabSaved = ["overlay", "nico", "obs"].includes(settingsTabSavedRaw)
+      ? settingsTabSavedRaw
+      : "overlay";
+    const viewerTabSaved = ["comments", "participants", "ohayo"].includes(viewerTabSavedRaw)
+      ? viewerTabSavedRaw
+      : "comments";
 
     function setActiveTab(buttons, target) {
       buttons.forEach((btn) => {
@@ -1097,19 +1113,21 @@
     }
 
     function showSettingsTab(name) {
+      if (!["overlay", "nico", "obs"].includes(name)) name = "overlay";
       if (overlayCol) overlayCol.classList.toggle("hidden", name !== "overlay");
       if (nicoCol) nicoCol.classList.toggle("hidden", name !== "nico");
-      if (supersCol) supersCol.classList.toggle("hidden", name !== "supers" && name !== "effects");
+      if (supersCol) supersCol.classList.add("hidden");
       if (obsCol) obsCol.classList.toggle("hidden", name !== "obs");
-      if (supersBox) supersBox.classList.toggle("hidden", name !== "supers");
-      if (effectsBox) effectsBox.classList.toggle("hidden", name !== "effects");
+      if (supersBox) supersBox.classList.add("hidden");
+      if (effectsBox) effectsBox.classList.add("hidden");
       setActiveTab(settingsTabs, name);
       localStorage.setItem("yt-overlay-settings-tab", name);
     }
 
     function showViewerTab(name) {
+      if (!["comments", "participants", "ohayo"].includes(name)) name = "comments";
       if (viewerCommentsCard) viewerCommentsCard.classList.toggle("hidden", name !== "comments");
-      if (viewerSupersCard) viewerSupersCard.classList.toggle("hidden", name !== "supers");
+      if (viewerSupersCard) viewerSupersCard.classList.add("hidden");
       if (viewerParticipantsCard) viewerParticipantsCard.classList.toggle("hidden", name !== "participants");
       if (viewerOhayoCard) viewerOhayoCard.classList.toggle("hidden", name !== "ohayo");
       setActiveTab(viewerTabs, name);
@@ -1158,7 +1176,7 @@
     obsPort.value = String(s.port || 4455);
     obsPassword.value = s.password || "";
     obsSources.value = s.sources || "";
-    const selected = new Set(Array.isArray(s.items) ? s.items : ["overlay", "niconico", "participants", "ohayo"]);
+    const selected = new Set(Array.isArray(s.items) ? s.items : ["overlay", "niconico", "participantsVertical", "participantsHorizontal", "ohayo"]);
     obsSourceItems.forEach((el) => {
       el.checked = selected.has(el.value);
     });
@@ -1672,6 +1690,7 @@
   let currentVideoId = null;
   let superReadMap = {};
   let participantMap = {};
+  let participantDragKey = null;
   let ohayoState = { count: 0, detected: 0, adjustment: 0, entries: [] };
 
   const superKinds = new Set([
@@ -1833,6 +1852,15 @@
         authorKey,
       }),
     });
+  }
+
+  async function reorderParticipants(authorKeys) {
+    const res = await fetch(`${PARTICIPANT_ENDPOINT}/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId: currentParticipantKey(), authorKeys }),
+    });
+    if (!res.ok) throw new Error(`participant reorder failed: ${res.status}`);
   }
 
   function findLatestVideoId(data) {
@@ -2177,9 +2205,11 @@
   }
 
   async function renderParticipants() {
+    if (participantDragKey) return;
     try {
       await refreshParticipantMapFromServer();
     } catch (_) {}
+    if (participantDragKey) return;
     const hideDone = participantHideDone.checked;
     const items = participantItems();
     const waitingItems = items.filter((item) => item.status !== "done");
@@ -2190,6 +2220,45 @@
       const rank = waitingItems.findIndex((item) => item.author_key === entry.author_key) + 1;
       const item = document.createElement("div");
       item.className = "list-item" + (entry.status === "done" ? " done" : " unread");
+      item.dataset.participantKey = entry.author_key;
+      if (entry.status !== "done") {
+        item.draggable = true;
+        item.classList.add("participant-draggable");
+        item.addEventListener("dragstart", (event) => {
+          participantDragKey = entry.author_key;
+          item.classList.add("participant-dragging");
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", entry.author_key);
+        });
+        item.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          const dragging = participantList.querySelector(".participant-dragging");
+          if (!dragging || dragging === item) return;
+          const rect = item.getBoundingClientRect();
+          const before = event.clientY < rect.top + rect.height / 2;
+          participantList.insertBefore(dragging, before ? item : item.nextSibling);
+        });
+        item.addEventListener("drop", async (event) => {
+          event.preventDefault();
+          const keys = Array.from(participantList.querySelectorAll('.participant-draggable'))
+            .map((row) => row.dataset.participantKey)
+            .filter(Boolean);
+          participantDragKey = null;
+          try {
+            await reorderParticipants(keys);
+          } catch (error) {
+            console.error("participant reorder failed", error);
+          }
+          await renderParticipants();
+        });
+        item.addEventListener("dragend", () => {
+          item.classList.remove("participant-dragging");
+          if (participantDragKey) {
+            participantDragKey = null;
+            renderParticipants();
+          }
+        });
+      }
 
       const num = document.createElement("div");
       num.className = "participant-rank";

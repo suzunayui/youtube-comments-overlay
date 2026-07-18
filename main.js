@@ -86,7 +86,7 @@ const DEFAULT_OBS_SETTINGS = {
   port: 4455,
   password: "",
   sources: "",
-  items: ["overlay", "niconico", "participants", "ohayo"],
+  items: ["overlay", "niconico", "participantsVertical", "participantsHorizontal", "ohayo"],
 };
 const OBS_BROWSER_SOURCE_DEFS = [
   {
@@ -106,12 +106,20 @@ const OBS_BROWSER_SOURCE_DEFS = [
     height: 1080,
   },
   {
-    id: "participants",
-    label: "参加管理",
-    inputName: "YT Overlay - Participants",
-    url: "http://127.0.0.1:5000/participants",
+    id: "participantsVertical",
+    label: "参加管理（縦並び）",
+    inputName: "YT Overlay - Participants Vertical",
+    url: "http://127.0.0.1:5000/participants?layout=vertical",
     width: 520,
     height: 720,
+  },
+  {
+    id: "participantsHorizontal",
+    label: "参加管理（横並び）",
+    inputName: "YT Overlay - Participants Horizontal",
+    url: "http://127.0.0.1:5000/participants?layout=horizontal",
+    width: 1920,
+    height: 300,
   },
   {
     id: "ohayo",
@@ -344,8 +352,11 @@ function obsSettingsPath() {
 function normalizeObsSettings(raw = {}) {
   const port = parseInt(raw.port, 10);
   const knownIds = new Set(OBS_BROWSER_SOURCE_DEFS.map((item) => item.id));
-  const items = Array.isArray(raw.items)
-    ? raw.items.filter((id) => knownIds.has(id))
+  const migratedItems = Array.isArray(raw.items)
+    ? raw.items.map((id) => id === "participants" ? "participantsVertical" : id)
+    : null;
+  const items = migratedItems
+    ? migratedItems.filter((id) => knownIds.has(id))
     : DEFAULT_OBS_SETTINGS.items;
   return {
     enabled: raw.enabled === true,
@@ -622,7 +633,11 @@ function loadOhayoState() {
 function participantItems(videoId) {
   return Array.from(getParticipantBucket(videoId).values())
     .filter((item) => item.status !== "deleted")
-    .sort((a, b) => (a.accepted_ms || 0) - (b.accepted_ms || 0));
+    .sort((a, b) => {
+      const aOrder = Number.isFinite(a.queue_order) ? a.queue_order : (a.accepted_ms || 0);
+      const bOrder = Number.isFinite(b.queue_order) ? b.queue_order : (b.accepted_ms || 0);
+      return aOrder - bOrder;
+    });
 }
 
 function upsertParticipantFromComment(msg) {
@@ -652,6 +667,7 @@ function upsertParticipantFromComment(msg) {
     icon: msg.icon || "",
     text,
     accepted_ms: Number(msg.timestamp_ms) || Date.now(),
+    queue_order: Number(msg.timestamp_ms) || Date.now(),
     status: "waiting",
   });
   saveParticipantState();
@@ -988,6 +1004,35 @@ function createOverlayServer() {
     res.json({ ok: true, item });
   });
 
+  srv.post("/api/participants/reorder", express.json(), (req, res) => {
+    const videoId = req.body?.videoId || "default";
+    const authorKeys = Array.isArray(req.body?.authorKeys)
+      ? req.body.authorKeys.map(String)
+      : [];
+    const bucket = getParticipantBucket(videoId);
+    const current = participantItems(videoId);
+    const waiting = current.filter((item) => item.status === "waiting");
+    const requested = new Set(authorKeys);
+    const ordered = [
+      ...authorKeys.map((key) => bucket.get(key)).filter((item) => item?.status === "waiting"),
+      ...waiting.filter((item) => !requested.has(item.author_key)),
+    ];
+    const orderedAll = [
+      ...ordered,
+      ...current.filter((item) => item.status !== "waiting"),
+    ];
+    const baseOrder = current.reduce((min, item) => {
+      const value = Number.isFinite(item.queue_order) ? item.queue_order : (item.accepted_ms || Date.now());
+      return Math.min(min, value);
+    }, Date.now());
+    orderedAll.forEach((item, index) => {
+      item.queue_order = baseOrder + index;
+      item.updated_ms = Date.now();
+    });
+    saveParticipantState();
+    res.json({ ok: true, items: participantItems(videoId) });
+  });
+
   srv.post("/api/participants/delete", express.json(), (req, res) => {
     const videoId = req.body?.videoId || "default";
     const authorKey = String(req.body?.authorKey || "");
@@ -1308,6 +1353,7 @@ function createObsLauncherFiles() {
   makeLauncher("niconico-launcher.html", "http://127.0.0.1:5000/niconico");
   makeLauncher("supers-launcher.html", "http://127.0.0.1:5000/supers");
   makeLauncher("participants-launcher.html", "http://127.0.0.1:5000/participants");
+  makeLauncher("participants-horizontal-launcher.html", "http://127.0.0.1:5000/participants?layout=horizontal");
   makeLauncher("ohayo-launcher.html", "http://127.0.0.1:5000/ohayo");
   makeLauncher("concurrent-launcher.html", "http://127.0.0.1:5000/concurrent");
   makeLauncher("effects-launcher.html", "http://127.0.0.1:5000/effects");
