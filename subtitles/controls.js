@@ -7,8 +7,9 @@ function options(select,items,value) {
 }
 function render(next) {
   state=next;
-  $('speechAlignment').value=state.style.alignment||'center';
-  $('speechPreview').style.textAlign=$('speechAlignment').value;
+  const alignment=state.style.alignment||'center';
+  for(const radio of $('speechAlignment').querySelectorAll('input')) radio.checked=radio.value===alignment;
+  $('speechPreview').style.textAlign=alignment;
   const key=JSON.stringify([state.devices,state.gpus]);
   if(key!==deviceKey){
     deviceKey=key;
@@ -26,7 +27,7 @@ function render(next) {
   const clear=()=>{ $('speechJapanese').textContent='';$('speechEnglish').textContent='';};
   if(remaining>0){$('speechJapanese').textContent=state.subtitle.ja;$('speechEnglish').textContent=state.subtitle.en;timer=setTimeout(clear,remaining);}else clear();
 }
-function style() {return {...state.style,fontSize:$('speechFontSize').value,englishSize:$('speechEnglishSize').value,duration:$('speechDuration').value,maskProfanity:$('speechMaskProfanity').checked,alignment:$('speechAlignment').value};}
+function style() {return {...state.style,fontSize:$('speechFontSize').value,englishSize:$('speechEnglishSize').value,duration:$('speechDuration').value,maskProfanity:$('speechMaskProfanity').checked,alignment:$('speechAlignment').querySelector('input:checked')?.value||'center'};}
 function settings() {return {config:{microphone:$('speechMicrophone').value,device:$('speechDevice').value,model:$('speechModel').value,threshold:$('speechThreshold').value},style:style()};}
 async function invoke(channel,arg){try{render(await ipcRenderer.invoke(channel,arg));}catch(error){$('speechStatus').textContent=error.message;}}
 $('speechStart').onclick=()=>invoke('speech:start',settings());
@@ -34,7 +35,8 @@ $('speechStop').onclick=()=>invoke('speech:stop');
 $('speechReload').onclick=()=>invoke('speech:reload');
 for(const id of ['speechMicrophone','speechDevice','speechModel','speechThreshold']) $(id).onchange=()=>{if(state)invoke('speech:settings',settings());};
 $('speechClear').onclick=()=>invoke('speech:clear');
-for(const id of ['speechFontSize','speechEnglishSize','speechDuration','speechMaskProfanity','speechAlignment']) $(id).onchange=()=>invoke('speech:style',style());
+for(const id of ['speechFontSize','speechEnglishSize','speechDuration','speechMaskProfanity']) $(id).onchange=()=>invoke('speech:style',style());
+for(const radio of $('speechAlignment').querySelectorAll('input')) radio.onchange=()=>invoke('speech:style',style());
 ipcRenderer.on('speech:state',(_event,next)=>render(next));
 ipcRenderer.invoke('speech:get-state').then(next=>{
   const config=next.settings.config;

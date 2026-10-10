@@ -55,6 +55,29 @@
     font-size: 13px;
   }
 
+  .speech-alignment {
+    border: 0;
+    padding: 0;
+    margin: 8px 0 0;
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .speech-alignment-options {
+    display: flex;
+    gap: 16px;
+    margin-top: 4px;
+  }
+
+  .speech-alignment-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
   input[type="text"],
   input[type="password"],
   input[type="number"] {
@@ -744,7 +767,14 @@
         <div class="buttons"><button id="speechClear">字幕を消す</button></div>
         <label>日本語の文字サイズ<input id="speechFontSize" type="number" min="16" max="100" value="46"></label>
         <label>英語の文字サイズ<input id="speechEnglishSize" type="number" min="12" max="80" value="32"></label>
-        <label>字幕の配置<select id="speechAlignment"><option value="center">中央寄せ</option><option value="left">左寄せ</option><option value="right">右寄せ</option></select></label>
+        <fieldset id="speechAlignment" class="speech-alignment">
+          <legend>字幕の配置</legend>
+          <div class="speech-alignment-options">
+            <label><input type="radio" name="speechAlignment" value="center" checked> 中央寄せ</label>
+            <label><input type="radio" name="speechAlignment" value="left"> 左寄せ</label>
+            <label><input type="radio" name="speechAlignment" value="right"> 右寄せ</label>
+          </div>
+        </fieldset>
         <label>表示秒数<input id="speechDuration" type="number" min="2" max="60" value="10"></label>
         <label><input id="speechMaskProfanity" type="checkbox" checked> 字幕を一部伏字にする（fuck → f**k）</label>
         <small>英語のfuckとその活用形、カタカナの「ファック」が対象です。</small>
