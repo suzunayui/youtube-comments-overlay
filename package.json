@@ -1,6 +1,6 @@
 {
   "name": "yt-overlay",
-  "version": "2026.10.10-15",
+  "version": "2026.10.10-16",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

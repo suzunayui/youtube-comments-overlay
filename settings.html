@@ -740,10 +740,11 @@
         <div class="buttons"><button id="speechStart" disabled>字幕開始</button><button id="speechStop" disabled>字幕停止</button><button id="speechReload">デバイス再読み込み</button></div>
         <p id="speechStatus" role="status">マイクを準備中</p>
         <label>マイク音量 <meter id="speechLevel" min="0" max="1" value="0" style="width:80%"></meter></label>
-        <div style="background:#000;color:white;border-radius:20px;padding:20px;text-align:center;margin:16px 0"><p id="speechJapanese">日本語字幕</p><p id="speechEnglish">English subtitles</p></div>
+        <div id="speechPreview" style="background:#000;color:white;border-radius:20px;padding:20px;text-align:center;margin:16px 0"><p id="speechJapanese">日本語字幕</p><p id="speechEnglish">English subtitles</p></div>
         <div class="buttons"><button id="speechClear">字幕を消す</button></div>
         <label>日本語の文字サイズ<input id="speechFontSize" type="number" min="16" max="100" value="46"></label>
         <label>英語の文字サイズ<input id="speechEnglishSize" type="number" min="12" max="80" value="32"></label>
+        <label>字幕の配置<select id="speechAlignment"><option value="center">中央寄せ</option><option value="left">左寄せ</option><option value="right">右寄せ</option></select></label>
         <label>表示秒数<input id="speechDuration" type="number" min="2" max="60" value="10"></label>
         <label><input id="speechMaskProfanity" type="checkbox" checked> 字幕を一部伏字にする（fuck → f**k）</label>
         <small>英語のfuckとその活用形、カタカナの「ファック」が対象です。</small>
