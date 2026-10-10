@@ -139,3 +139,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .serena
+.venv/
+models/
+build/
+test-output/
+__pycache__/
+*.pyc

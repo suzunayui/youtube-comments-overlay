@@ -691,27 +691,64 @@
 
     <div class="tab-column">
       <div class="tab-bar" id="mainTabs">
-        <button class="tab-btn active" data-tab="settings">設定</button>
-        <button class="tab-btn" data-tab="viewer">コメント閲覧</button>
-      </div>
-
-      <div class="tab-bar" id="viewerTabs">
-        <button class="tab-btn active" data-tab="comments">コメント</button>
+        <button class="tab-btn active" data-tab="overlay">通常設定</button>
+        <button class="tab-btn" data-tab="nico">ニコニコ設定</button>
+        <button class="tab-btn" data-tab="obs">OBS設定</button>
+        <button class="tab-btn" data-tab="comments">コメント</button>
+        <button class="tab-btn" data-tab="supers">スパチャ・メンバー</button>
         <button class="tab-btn" data-tab="participants">参加管理</button>
         <button class="tab-btn" data-tab="ohayo">おはよう</button>
+        <button class="tab-btn" data-tab="speech">音声字幕</button>
+        <button class="tab-btn" data-tab="addons">機能の導入</button>
       </div>
 
-      <div class="tab-bar" id="settingsTabs">
-        <button class="tab-btn active" data-tab="overlay">通常</button>
-        <button class="tab-btn" data-tab="nico">ニコニコ</button>
-        <button class="tab-btn" data-tab="obs">OBS設定</button>
-      </div>
+
     </div>
 
   </div>
 
   <div class="right-panel">
     <div class="tab-content">
+      <div id="addonsPanel" class="hidden" style="max-width:850px;padding:20px">
+        <h2>機能の導入</h2>
+        <p>使いたい機能だけ導入してください。取得済みのモデルは再利用します。</p>
+        <fieldset style="border:1px solid #555;border-radius:10px;padding:16px;margin-bottom:20px">
+          <legend>音声字幕・GPU高速化</legend>
+          <p>マイクの音声から日本語・英語の字幕を表示します。導入後は「音声字幕」タブで操作できます。</p>
+          <div class="buttons"><button id="installSpeech">音声字幕を導入</button><button id="installCuda">GPU高速化を導入</button></div>
+          <p id="speechInstallStatus" role="status" style="overflow-wrap:anywhere"></p>
+          <small>音声字幕は約100MB、GPU高速化は追加で約1.3GBを取得します。CPUだけで使う場合、GPU高速化の導入は不要です。モデルは最初の開始時に取得します。</small>
+        </fieldset>
+        <fieldset style="border:1px solid #555;border-radius:10px;padding:16px">
+          <legend>外国語コメントの翻訳</legend>
+          <button id="installTranslation">コメント翻訳を導入</button>
+          <p id="translationInstallStatus" role="status" style="overflow-wrap:anywhere"></p>
+          <label><input id="translationEnabled" type="checkbox" checked style="width:auto"> 原文の下に日本語訳を表示</label>
+          <label>翻訳に使うデバイス<select id="translationDevice"><option value="cpu">CPU（低速）</option></select></label>
+          <p id="translationStatus" role="status">翻訳は停止中です</p>
+          <small>TranslateGemma 12B・ローカル処理・API料金0円。初回のみ約7.3GBを取得します。GPU推奨。Gemma利用規約が適用されます。</small>
+        </fieldset>
+      </div>
+      <div id="speechPanel" class="hidden" style="max-width:850px;padding:20px">
+        <h2>マイクから日本語・英語の字幕を表示</h2>
+        <p>必要なライブラリは「機能の導入」タブから追加できます。</p>
+        <p>マイクなどの設定は自動保存されます。設定済みなら「チャット取得開始」で字幕も開始し、「チャット取得停止」で一緒に停止します。字幕だけの開始・停止もできます。</p>
+        <label>マイク<select id="speechMicrophone"></select></label>
+        <label>音声認識に使うデバイス<select id="speechDevice"><option value="cpu">CPU（低速）</option></select></label>
+        <label>認識モデル<select id="speechModel"><option value="large-v3">large-v3（精度重視・推奨）</option><option value="medium">medium</option><option value="small">small（速度重視）</option><option value="base">base</option></select></label>
+        <label>音声検出しきい値<input id="speechThreshold" type="number" min="0.3" max="0.8" step="0.05" value="0.5"></label>
+        <div class="buttons"><button id="speechStart" disabled>字幕開始</button><button id="speechStop" disabled>字幕停止</button><button id="speechReload">デバイス再読み込み</button></div>
+        <p id="speechStatus" role="status">マイクを準備中</p>
+        <label>マイク音量 <meter id="speechLevel" min="0" max="1" value="0" style="width:80%"></meter></label>
+        <div style="background:#000;color:white;border-radius:20px;padding:20px;text-align:center;margin:16px 0"><p id="speechJapanese">日本語字幕</p><p id="speechEnglish">English subtitles</p></div>
+        <div class="buttons"><button id="speechClear">字幕を消す</button></div>
+        <label>日本語の文字サイズ<input id="speechFontSize" type="number" min="16" max="100" value="46"></label>
+        <label>英語の文字サイズ<input id="speechEnglishSize" type="number" min="12" max="80" value="32"></label>
+        <label>表示秒数<input id="speechDuration" type="number" min="2" max="60" value="10"></label>
+        <label><input id="speechMaskProfanity" type="checkbox" checked> 字幕を一部伏字にする（fuck → f**k）</label>
+        <small>英語のfuckとその活用形、カタカナの「ファック」が対象です。</small>
+        <small>APIキー不要・API料金0円。録音や字幕の保存はしません。初回のみモデルを取得します。GPUが2枚ある場合はコメント翻訳と別のGPUを選ぶと負荷を分散できます。</small>
+      </div>
       <div class="settings-row" id="settingsPanel">
       <!-- オーバーレイ設定 -->
       <div class="settings-col">
@@ -969,6 +1006,7 @@
             <label><input type="checkbox" class="obs-source-item" value="participantsVertical" checked /> 参加管理（縦並び）</label>
             <label><input type="checkbox" class="obs-source-item" value="participantsHorizontal" checked /> 参加管理（横並び）</label>
             <label><input type="checkbox" class="obs-source-item" value="ohayo" checked /> おはよう</label>
+            <label><input type="checkbox" class="obs-source-item" value="subtitles" /> 日英音声字幕</label>
           </div>
           <div class="obs-actions">
             <button id="btnObsAddSources">現在シーンへHTML追加</button>
@@ -989,9 +1027,10 @@
       </div>
 
       <div class="viewer-card hidden" id="viewerSupersCard">
-        <h2>💎 スパチャ・メンバー読み</h2>
+        <h2>💎 スパチャ・メンバー</h2>
+        <p class="small">スパチャ・スーパーステッカー・加入／更新・マイルストーン・ギフト通知を残します。メンバーの通常コメントは含みません。クリックで既読／未読を切り替えられます。</p>
         <div class="viewer-controls">
-          <label><input type="checkbox" id="superUnreadOnly" checked /> 未読のみ</label>
+          <label><input type="checkbox" id="superUnreadOnly" /> 未読のみ</label>
           <button id="btnSuperMarkAll" class="secondary">全て既読</button>
           <button id="btnSuperCopy">未読をコピー</button>
           <span id="superCount" class="small"></span>
@@ -1040,6 +1079,31 @@
 
   const inputTarget = document.getElementById("inputTarget");
   const btnStart = document.getElementById("btnStart");
+  const translationEnabled = document.getElementById('translationEnabled');
+  const translationDevice = document.getElementById('translationDevice');
+  const translationStatus = document.getElementById('translationStatus');
+  function showTranslation(state) {
+    translationStatus.textContent = (state.status || '翻訳は停止中です') +
+      (state.active ? ` · 翻訳 ${state.translated}件 · 待機 ${state.queued}件 · スキップ ${state.skipped}件` : '');
+  }
+  async function saveTranslation() {
+    if (!translationEnabled.checked) {
+      for (const row of [...commentStore.values(),...supportStore.values()]) {delete row.translation_ja; delete row.source_language;}
+      renderComments(); renderSupers();
+    }
+    try {showTranslation(await ipcRenderer.invoke('translation:save', {enabled:translationEnabled.checked, device:translationDevice.value}));}
+    catch {translationStatus.textContent = '翻訳設定を保存できませんでした';}
+  }
+  translationEnabled.addEventListener('change', saveTranslation);
+  translationDevice.addEventListener('change', saveTranslation);
+  ipcRenderer.on('translation:state', (_event, state)=>showTranslation(state));
+  Promise.all([ipcRenderer.invoke('translation:get-state'), ipcRenderer.invoke('translation:devices')]).then(([state, devices])=>{
+    for (const gpu of devices) translationDevice.add(new Option(gpu.name, gpu.device));
+    translationEnabled.checked = state.settings.enabled;
+    translationDevice.value = state.settings.device;
+    if (!translationDevice.value) {translationDevice.value = 'cpu'; void saveTranslation();}
+    showTranslation(state);
+  }).catch(()=>{translationStatus.textContent = '翻訳設定を読み込めませんでした';});
   const btnStop = document.getElementById("btnStop");
   const statusEl = document.getElementById("status");
   const obsEnabled = document.getElementById("obsEnabled");
@@ -1054,12 +1118,8 @@
 
   const effectStatus = document.getElementById("effectStatus");
   const KEY = "yt-overlay-input";
-  const EFFECT_ENDPOINT = "http://127.0.0.1:5000/trigger-effect";
+  const EFFECT_ENDPOINT = `http://127.0.0.1:${process.env.YT_OVERLAY_TEST_PORT || '5000'}/trigger-effect`;
   const mainTabs = document.querySelectorAll("#mainTabs .tab-btn");
-  const settingsTabs = document.querySelectorAll("#settingsTabs .tab-btn");
-  const viewerTabs = document.querySelectorAll("#viewerTabs .tab-btn");
-  const settingsTabsBar = document.getElementById("settingsTabs");
-  const viewerTabsBar = document.getElementById("viewerTabs");
   const settingsPanel = document.getElementById("settingsPanel");
   const viewerPanel = document.getElementById("viewerPanel");
   const viewerCommentsCard = document.getElementById("viewerCommentsCard");
@@ -1080,15 +1140,17 @@
       inputTarget.value = saved;
     }
 
-    const mainTabSaved = localStorage.getItem("yt-overlay-main-tab") || "settings";
+    const mainTabSavedRaw = localStorage.getItem("yt-overlay-main-tab");
     const settingsTabSavedRaw = localStorage.getItem("yt-overlay-settings-tab") || "overlay";
     const viewerTabSavedRaw = localStorage.getItem("yt-overlay-viewer-tab") || "comments";
     const settingsTabSaved = ["overlay", "nico", "obs"].includes(settingsTabSavedRaw)
       ? settingsTabSavedRaw
       : "overlay";
-    const viewerTabSaved = ["comments", "participants", "ohayo"].includes(viewerTabSavedRaw)
+    const viewerTabSaved = ["comments", "supers", "participants", "ohayo"].includes(viewerTabSavedRaw)
       ? viewerTabSavedRaw
       : "comments";
+    const mainTabSaved = mainTabSavedRaw === 'settings' ? settingsTabSaved
+      : mainTabSavedRaw === 'viewer' ? viewerTabSaved : mainTabSavedRaw || 'overlay';
 
     function setActiveTab(buttons, target) {
       buttons.forEach((btn) => {
@@ -1097,17 +1159,15 @@
     }
 
     function showMainTab(name) {
-      if (name === "viewer") {
-        if (viewerPanel) viewerPanel.classList.remove("hidden");
-        if (settingsPanel) settingsPanel.classList.add("hidden");
-        if (settingsTabsBar) settingsTabsBar.classList.add("hidden");
-        if (viewerTabsBar) viewerTabsBar.classList.remove("hidden");
-      } else {
-        if (viewerPanel) viewerPanel.classList.add("hidden");
-        if (settingsPanel) settingsPanel.classList.remove("hidden");
-        if (settingsTabsBar) settingsTabsBar.classList.remove("hidden");
-        if (viewerTabsBar) viewerTabsBar.classList.add("hidden");
-      }
+      if (!['overlay','nico','obs','comments','supers','participants','ohayo','speech','addons'].includes(name)) name = 'overlay';
+      document.getElementById('speechPanel').classList.toggle('hidden', name !== 'speech');
+      document.getElementById('addonsPanel').classList.toggle('hidden', name !== 'addons');
+      const isSettings = ['overlay','nico','obs'].includes(name);
+      const isViewer = ['comments','supers','participants','ohayo'].includes(name);
+      if (viewerPanel) viewerPanel.classList.toggle('hidden', !isViewer);
+      if (settingsPanel) settingsPanel.classList.toggle('hidden', !isSettings);
+      if (isSettings) showSettingsTab(name);
+      if (isViewer) showViewerTab(name);
       setActiveTab(mainTabs, name);
       localStorage.setItem("yt-overlay-main-tab", name);
     }
@@ -1120,17 +1180,15 @@
       if (obsCol) obsCol.classList.toggle("hidden", name !== "obs");
       if (supersBox) supersBox.classList.add("hidden");
       if (effectsBox) effectsBox.classList.add("hidden");
-      setActiveTab(settingsTabs, name);
       localStorage.setItem("yt-overlay-settings-tab", name);
     }
 
     function showViewerTab(name) {
-      if (!["comments", "participants", "ohayo"].includes(name)) name = "comments";
+      if (!["comments", "supers", "participants", "ohayo"].includes(name)) name = "comments";
       if (viewerCommentsCard) viewerCommentsCard.classList.toggle("hidden", name !== "comments");
-      if (viewerSupersCard) viewerSupersCard.classList.add("hidden");
+      if (viewerSupersCard) viewerSupersCard.classList.toggle("hidden", name !== "supers");
       if (viewerParticipantsCard) viewerParticipantsCard.classList.toggle("hidden", name !== "participants");
       if (viewerOhayoCard) viewerOhayoCard.classList.toggle("hidden", name !== "ohayo");
-      setActiveTab(viewerTabs, name);
       localStorage.setItem("yt-overlay-viewer-tab", name);
     }
 
@@ -1139,17 +1197,9 @@
       btn.addEventListener("click", () => showMainTab(btn.dataset.tab));
     });
 
-    settingsTabs.forEach((btn) => {
-      btn.addEventListener("click", () => showSettingsTab(btn.dataset.tab));
-    });
-
-    viewerTabs.forEach((btn) => {
-      btn.addEventListener("click", () => showViewerTab(btn.dataset.tab));
-    });
 
 
-    showSettingsTab(settingsTabSaved);
-    showViewerTab(viewerTabSaved);
+
     showMainTab(mainTabSaved);
 
     loadObsSettings();
@@ -1251,25 +1301,24 @@
 
     localStorage.setItem(KEY, v);
 
-    statusEl.textContent = "ステータス: 起動中…";
+    renderChatStatus('starting');
     ipcRenderer.send("chat:start", { input: v, obs: readObsSettings() });
   });
 
   btnStop.addEventListener("click", () => {
     ipcRenderer.send("chat:stop");
-    statusEl.textContent = "ステータス: 停止要求を送信しました…";
+    statusEl.textContent = "ステータス: チャットを停止中…";
   });
 
   // メインプロセスからのステータス通知
-  ipcRenderer.on("chat:status", (_event, state) => {
-    if (state === "starting") {
-      statusEl.textContent = "ステータス: 起動中…";
-    } else if (state === "stopped") {
-      statusEl.textContent = "ステータス: 停止中";
-    } else {
-      statusEl.textContent = "ステータス: " + state;
-    }
-  });
+  function renderChatStatus(state) {
+    const labels={starting:'チャットに接続中…',running:'チャット取得中',reconnecting:'チャット再接続中…',stopped:'停止中'};
+    statusEl.textContent='ステータス: '+(labels[state]||state);
+    btnStart.disabled=state!=='stopped';
+    btnStop.disabled=state==='stopped';
+  }
+  ipcRenderer.on('chat:status',(_event,state)=>renderChatStatus(state));
+  ipcRenderer.invoke('chat:get-status').then(renderChatStatus);
 
   ipcRenderer.on("chat:error", (_event, message) => {
     statusEl.textContent = "ステータス: エラー: " + message;
@@ -1654,9 +1703,10 @@
   }, 500);
 
   // ========== コメントビュー / スパチャ読み ==========
-  const COMMENTS_ENDPOINT = "http://127.0.0.1:5000/comments";
-  const PARTICIPANT_ENDPOINT = "http://127.0.0.1:5000/api/participants";
-  const OHAYO_ENDPOINT = "http://127.0.0.1:5000/api/ohayo";
+  const COMMENTS_ENDPOINT = `http://127.0.0.1:${process.env.YT_OVERLAY_TEST_PORT || '5000'}/comments`;
+  const SUPPORT_ENDPOINT = `http://127.0.0.1:${process.env.YT_OVERLAY_TEST_PORT || '5000'}/api/support-comments`;
+  const PARTICIPANT_ENDPOINT = `http://127.0.0.1:${process.env.YT_OVERLAY_TEST_PORT || '5000'}/api/participants`;
+  const OHAYO_ENDPOINT = `http://127.0.0.1:${process.env.YT_OVERLAY_TEST_PORT || '5000'}/api/ohayo`;
   const SUPER_READ_KEY = "yt-overlay-super-read";
   const PARTICIPANT_KEY = "yt-overlay-participants";
   const PARTICIPANT_KEYWORD = "参加希望";
@@ -1684,6 +1734,9 @@
   const btnOhayoReset = document.getElementById("btnOhayoReset");
 
   const commentStore = new Map();
+  const supportStore = new Map();
+  let supportFetchRunning=false;
+  let supportRenderKey='';
   const highlightStartById = new Map();
   let initialLoaded = false;
   let lastAfterMs = 0;
@@ -1923,7 +1976,8 @@
   }
 
   function textFromMsg(msg) {
-    if (Array.isArray(msg.parts)) {
+    if(msg.kind==='membership'&&msg.text)return msg.text;
+    if (Array.isArray(msg.parts)&&msg.parts.length>0) {
       return msg.parts
         .map((part) => {
           if (part.type === "text") return part.text || "";
@@ -1937,8 +1991,21 @@
   }
 
   function renderParts(container, msg) {
+    const appendTranslation = () => {
+      if (!msg.translation_ja) return;
+      const line = document.createElement('div');
+      line.className = 'translation-ja'; line.lang = 'ja';
+      line.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid currentColor;white-space:pre-wrap';
+      line.textContent = msg.translation_ja; container.appendChild(line);
+    };
     container.textContent = "";
-    if (Array.isArray(msg.parts)) {
+    if (Array.isArray(msg.parts)&&msg.parts.length>0) {
+      if(msg.kind==='membership'){
+        const body=msg.parts.filter(part=>part.type==='text').map(part=>part.text||'').join('');
+        const full=msg.text||'';
+        const detail=body?(full.endsWith(body)?full.slice(0,-body.length).trim():''):full;
+        if(detail){const header=document.createElement('div');header.className='small membership-detail';header.textContent=detail;container.appendChild(header);}
+      }
       for (const part of msg.parts) {
         if (part.type === "text") {
           container.append(document.createTextNode(part.text || ""));
@@ -1956,9 +2023,10 @@
           container.append(img);
         }
       }
-      return;
+      appendTranslation(); return;
     }
     container.textContent = msg.text || "";
+    appendTranslation();
   }
 
   function hexToRgba(hex, alpha) {
@@ -2101,7 +2169,7 @@
 
   function renderSupers() {
     const unreadOnly = superUnreadOnly.checked;
-    const items = Array.from(commentStore.values())
+    const items = Array.from(supportStore.values())
       .filter((msg) => superKinds.has(msg.kind))
       .sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0));
 
@@ -2201,7 +2269,7 @@
       superList.scrollTop = superList.scrollHeight;
     }
 
-    superCount.textContent = `未読: ${unreadCount}`;
+    superCount.textContent = `合計: ${items.length}件 · 未読: ${unreadCount}`;
   }
 
   async function renderParticipants() {
@@ -2422,10 +2490,30 @@
     }
   }
 
+  async function fetchSupportCommentsOnce() {
+    if(supportFetchRunning)return;
+    supportFetchRunning=true;
+    const videoId=currentVideoId;
+    try{
+      const params=new URLSearchParams();if(videoId)params.set('video',videoId);
+      const res=await fetch(`${SUPPORT_ENDPOINT}?${params}`);
+      if(!res.ok)return;
+      const rows=await res.json();
+      if(!Array.isArray(rows)||videoId!==currentVideoId)return;
+      const key=JSON.stringify(rows);
+      if(key===supportRenderKey)return;
+      supportRenderKey=key;
+      supportStore.clear();
+      for(const msg of rows)if(superKinds.has(msg.kind))supportStore.set(buildId(msg),msg);
+      renderSupers();
+    }catch(error){console.error('fetchSupportCommentsOnce error',error);}
+    finally{supportFetchRunning=false;}
+  }
+
   async function fetchCommentsOnce(forceFull = false) {
     const params = new URLSearchParams();
     params.set("limit", "200");
-    if (!forceFull && lastAfterMs > 0) {
+    if (!translationEnabled.checked && !forceFull && lastAfterMs > 0) {
       params.set("after", String(lastAfterMs));
     }
     try {
@@ -2438,6 +2526,8 @@
       if (latestVideoId && latestVideoId !== currentVideoId) {
         currentVideoId = latestVideoId;
         commentStore.clear();
+        supportStore.clear();
+        supportRenderKey='';renderSupers();
         highlightStartById.clear();
         initialLoaded = false;
         lastAfterMs = 0;
@@ -2459,6 +2549,8 @@
           if (initialLoaded) {
             highlightStartById.set(id, Date.now());
           }
+        } else {
+          commentStore.set(id, msg);
         }
         const ts = Number.isFinite(msg.timestamp_ms) ? msg.timestamp_ms : 0;
         if (ts > maxTs) maxTs = ts;
@@ -2469,7 +2561,7 @@
       lastAfterMs = maxTs;
       trimStore();
       renderComments();
-      renderSupers();
+      await fetchSupportCommentsOnce();
       renderParticipants();
       updateOhayo();
     } catch (e) {
@@ -2487,7 +2579,7 @@
   btnSuperMarkAll.addEventListener("click", () => {
     const key = currentReadKey();
     if (!superReadMap[key]) superReadMap[key] = {};
-    for (const msg of commentStore.values()) {
+    for (const msg of supportStore.values()) {
       if (!superKinds.has(msg.kind)) continue;
       superReadMap[key][buildId(msg)] = true;
     }
@@ -2495,7 +2587,7 @@
     renderSupers();
   });
   btnSuperCopy.addEventListener("click", async () => {
-    const items = Array.from(commentStore.values())
+    const items = Array.from(supportStore.values())
       .filter((msg) => superKinds.has(msg.kind))
       .filter((msg) => !isRead(buildId(msg)))
       .sort((a, b) => (a.timestamp_ms || 0) - (b.timestamp_ms || 0));
@@ -2557,6 +2649,8 @@
   updateOhayo();
   setInterval(fetchCommentsOnce, 1000);
   fetchCommentsOnce(true);
+  require('./subtitles/controls');
+  require('./runtime/controls');
 </script>
 </body>
 </html>

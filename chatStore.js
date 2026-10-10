@@ -3,6 +3,12 @@
 const path = require("path");
 const fs = require("fs");
 const Database = require("better-sqlite3");
+const {EventEmitter} = require('node:events');
+const commentEvents = new EventEmitter();
+function onCommentSaved(listener) {
+  commentEvents.on('comment', listener);
+  return () => commentEvents.off('comment', listener);
+}
 
 let db = null;
 let insertStmt = null;
@@ -279,7 +285,7 @@ function saveComment(msg) {
   const partsJson = JSON.stringify(msg.parts || []);
   const colorsJson = JSON.stringify(msg.colors || null);
   try {
-    insertStmt.run(
+    const result = insertStmt.run(
       msg.id,
       msg.video_id || null,
       msg.timestamp_ms ?? null,
@@ -296,12 +302,14 @@ function saveComment(msg) {
       msg.is_moderator ? 1 : 0,
       msg.is_owner ? 1 : 0
     );
+    if (result.changes > 0) commentEvents.emit('comment', msg);
+    return result.changes > 0;
   } catch (err) {
     console.warn("saveComment sqlite error:", err.message || err);
   }
 }
 
-function getRecentComments(limit = DEFAULT_LIMIT) {
+function getRecentComments(limit = DEFAULT_LIMIT, filter = {}) {
   return new Promise((resolve) => {
     if (!db) {
       resolve([]);
@@ -309,11 +317,21 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
     }
     try {
       const lim = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 500)) : DEFAULT_LIMIT;
+      const params=[];
+      let where='';
+      if(filter.supportOnly){
+        const videoId=filter.videoId||db.prepare('SELECT video_id FROM comments ORDER BY timestamp_ms DESC, rowid DESC LIMIT 1').get()?.video_id||'';
+        where="WHERE kind IN ('paid','sticker','membership','gift_purchase','gift_redeem') AND COALESCE(video_id,'') = ?";
+        params.push(videoId);
+      }
+      const unlimited=filter.supportOnly&&limit===null;
+      if(!unlimited)params.push(lim);
       const sql = `SELECT id, video_id, timestamp_ms, timestamp, author, text, kind, amount, amount_text, icon, parts_json, colors_json, is_member, is_moderator, is_owner
                    FROM comments
+                   ${where}
                    ORDER BY timestamp_ms DESC, rowid DESC
-                   LIMIT ?`;
-      const rows = db.prepare(sql).all(lim);
+                   ${unlimited?'':'LIMIT ?'}`;
+      const rows = db.prepare(sql).all(...params);
       const result = rows.reverse().map((r) => {
         let parts = [];
         let colors = null;
@@ -351,6 +369,10 @@ function getRecentComments(limit = DEFAULT_LIMIT) {
       resolve([]);
     }
   });
+}
+
+function getSupportComments(videoId) {
+  return getRecentComments(null,{supportOnly:true,videoId});
 }
 
 function getAuthorFirstSeenMap(authors) {
@@ -438,9 +460,11 @@ function closeChatStore() {
 }
 
 module.exports = {
+  onCommentSaved,
   initChatStore,
   saveComment,
   getRecentComments,
+  getSupportComments,
   getAuthorFirstSeenMap,
   getVideoFirstSeenMap,
   getAuthorVideoFirstSeenRows,

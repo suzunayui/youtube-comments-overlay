@@ -30,16 +30,11 @@
         color: var(--color-text, #ffffff);
         pointer-events: none;
 
-        /* 太い黒フチ（袋文字） */
-        text-shadow: var(--text-shadow,
-          -5px -5px 0 #000,
-           5px -5px 0 #000,
-          -5px  5px 0 #000,
-           5px  5px 0 #000,
-          -6px  0   0 #000,
-           6px  0   0 #000,
-           0  -6px  0 #000,
-           0   6px  0 #000);
+        /* 文字の輪郭を連続した線で描き、塗りを上に重ねる。 */
+        -webkit-text-stroke: var(--stroke-width, 12px) var(--stroke-color, #000);
+        paint-order: stroke fill;
+        text-shadow: none;
+        will-change: transform;
 
         left: 0; /* 実際の位置は JS で動かす */
     }
@@ -102,18 +97,10 @@ async function fetchAndApplySettings() {
         if (shadowEnabled) {
             const sc = hexToRgba(shadowColor, shadowAlpha);
             const stroke = Math.max(Math.round(fontSize / 12), 3);
-            root.style.setProperty("--text-shadow", `
-                -${stroke}px -${stroke}px 0 ${sc},
-                 ${stroke}px -${stroke}px 0 ${sc},
-                -${stroke}px  ${stroke}px 0 ${sc},
-                 ${stroke}px  ${stroke}px 0 ${sc},
-                -${stroke+1}px  0   0 ${sc},
-                 ${stroke+1}px  0   0 ${sc},
-                 0  -${stroke+1}px  0 ${sc},
-                 0   ${stroke+1}px  0 ${sc}
-            `);
+            root.style.setProperty("--stroke-width", `${2 * stroke}px`);
+            root.style.setProperty("--stroke-color", sc);
         } else {
-            root.style.setProperty("--text-shadow", "none");
+            root.style.setProperty("--stroke-width", "0px");
         }
     } catch (e) {
         console.error("fetchAndApplySettings error", e);
@@ -283,6 +270,7 @@ function spawnFallingEmoji(msg) {
 function spawnScrollingBullet(msg, { onComplete, color } = {}) {
     const div = document.createElement("div");
     div.className = "bullet";
+    div.style.transform = `translate3d(${window.innerWidth}px, 0, 0)`;
     const content = document.createElement("span");
 
     const rawText = (msg.text || "").trim();
@@ -343,7 +331,7 @@ function spawnScrollingBullet(msg, { onComplete, color } = {}) {
             lastTime = timestamp;
 
             x -= speed * dt;
-            div.style.left = x + "px";
+            div.style.transform = `translate3d(${x}px, 0, 0)`;
 
             if (x + size.width < 0) {
                 if (typeof onComplete === "function") {

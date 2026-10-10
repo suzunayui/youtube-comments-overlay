@@ -8,6 +8,7 @@ const chatStore = require("./chatStore");
 
 let stopFlag = false;
 let running = false;
+let generation = 0;
 
 // ==============================
 // 共通ユーティリティ
@@ -605,25 +606,27 @@ async function fetchChatOnce(apiKey, clientVersion, continuation) {
  *
  * inputStr : videoId / チャンネルID / @handle のどれでもOK
  */
-async function startLiveChat(inputStr) {
-  if (running) {
+async function startLiveChat(inputStr, onStatus = () => {}) {
+  if (running && !stopFlag) {
     console.log("startLiveChat: すでに実行中なのでスキップ");
     return;
   }
 
   running = true;
   stopFlag = false;
+  const currentGeneration = ++generation;
 
   try {
     const videoId = await resolveVideoId(inputStr);
     if (!videoId) {
-      console.log("❌ 配信中の動画が見つかりません");
-      return;
+      throw new Error('配信中の動画が見つかりません');
     }
+    if (stopFlag || currentGeneration !== generation) return;
 
     console.log("🎥 配信中 videoId =", videoId);
 
     const html = await getWatchHtml(videoId);
+    if (stopFlag || currentGeneration !== generation) return;
     const { apiKey, clientVersion, continuation: cont0 } =
       extractOptionsFromHtml(html);
 
@@ -632,10 +635,11 @@ async function startLiveChat(inputStr) {
       clientVersion,
       cont0
     );
+    if (stopFlag || currentGeneration !== generation) return;
 
     console.log("💬 ライブチャット取得開始");
 
-    while (!stopFlag) {
+    while (!stopFlag && currentGeneration === generation) {
       try {
         const { chatItems, nextCont, timeoutMs } = await fetchChatOnce(
           apiKey,
@@ -643,6 +647,8 @@ async function startLiveChat(inputStr) {
           continuation
         );
         continuation = nextCont;
+        if (stopFlag || currentGeneration !== generation) break;
+        onStatus('running');
 
         for (const msg of chatItems) {
           msg.video_id = videoId;
@@ -651,7 +657,8 @@ async function startLiveChat(inputStr) {
 
         await sleep(timeoutMs);
       } catch (e) {
-        if (stopFlag) break;
+        if (stopFlag || currentGeneration !== generation) break;
+        onStatus('reconnecting');
         console.error("⚠ 取得中にエラー:", e);
         await sleep(5000);
       }
@@ -659,7 +666,7 @@ async function startLiveChat(inputStr) {
 
     console.log("⏹ チャット取得ループ終了");
   } finally {
-    running = false;
+    if (currentGeneration === generation) running = false;
   }
 }
 

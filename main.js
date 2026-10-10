@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
@@ -8,9 +8,11 @@ const { chromium } = require("playwright");
 const OBSWebSocket = require("obs-websocket-js").default;
 const {
   initChatStore,
+  onCommentSaved,
   closeChatStore,
   getDbPath,
   getRecentComments,
+  getSupportComments,
   getAuthorFirstSeenMap,
   getVideoFirstSeenMap,
   getAuthorVideoFirstSeenRows,
@@ -26,6 +28,168 @@ const {
   resolveVideoId,
 } = require("./youtubeChat");
 
+const {LocalTranslation} = require('./translation/local-translation');
+const {CommentTranslation} = require('./translation/comments');
+const {execFileSync} = require('node:child_process');
+if (process.env.YT_OVERLAY_TEST_USER_DATA) app.setPath('userData', process.env.YT_OVERLAY_TEST_USER_DATA);
+let commentTranslation = null;
+let chatRequested = false;
+let chatGeneration = 0;
+let currentChatStatus = 'stopped';
+function reportChatStatus(status) {
+  if(currentChatStatus===status)return;
+  currentChatStatus=status;
+  if(isWindowAlive())mainWindow.webContents.send('chat:status',status);
+}
+ipcMain.handle('chat:get-status',()=>currentChatStatus);
+function translationSettingsPath() {return path.join(app.getPath('userData'), 'translation-settings.json');}
+function normalizeTranslation(raw = {}) {
+  return {enabled:raw.enabled !== false, device:/^cuda:\d+$/.test(raw.device) ? raw.device : 'cpu'};
+}
+function loadTranslationSettings() {
+  try {return normalizeTranslation(JSON.parse(fs.readFileSync(translationSettingsPath(), 'utf8')));}
+  catch {return {enabled:true, device:'cuda:0'};}
+}
+function translationState() {return {...(commentTranslation?.state || {}), settings:loadTranslationSettings()};}
+function prepareCommentTranslation() {
+  const root = __dirname;
+  const command = optionalRuntime.python;
+  const args = ['-u', optionalRuntime.worker('translation')];
+  const runtime = optionalRuntime.llama;
+  const worker = new LocalTranslation(command, args, {windowsHide:true, cwd:app.getPath('userData'),
+    env:{...process.env, PYTHONUTF8:'1', SUBTITLE_MODEL_DIR:process.env.YT_OVERLAY_MODEL_DIR || path.join(app.getPath('userData'),'models'),
+      SUBTITLE_TRANSLATION_RUNTIME:runtime, SUBTITLE_SHARED_MODEL_DIR:path.join(app.getPath('appData'),'live-subtitle-assistant','models')}});
+  commentTranslation = new CommentTranslation(worker, state=>{
+    if (isWindowAlive()) mainWindow.webContents.send('translation:state', {...state, settings:loadTranslationSettings()});
+  });
+  onCommentSaved(comment=>commentTranslation.enqueue(comment));
+}
+ipcMain.handle('translation:get-state', () => translationState());
+ipcMain.handle('translation:devices', () => {
+  try {
+    return execFileSync('nvidia-smi', ['--query-gpu=index,name','--format=csv,noheader'], {windowsHide:true,encoding:'utf8',timeout:5000})
+      .trim().split(/\r?\n/).map(line=>{const [index,...name] = line.split(','); return {device:`cuda:${Number(index)}`, name:name.join(',').trim()};});
+  } catch {return [];}
+});
+ipcMain.handle('translation:save', (_event, raw) => {
+  const previous = loadTranslationSettings(); const settings = normalizeTranslation(raw);
+  fs.writeFileSync(translationSettingsPath(), JSON.stringify(settings));
+  if (chatRequested && (previous.enabled !== settings.enabled || previous.device !== settings.device)) {
+    if (settings.enabled) startTranslation(settings.device); else commentTranslation.stop();
+  }
+  return translationState();
+});
+
+const OVERLAY_PORT = Number(process.env.YT_OVERLAY_TEST_PORT) || 5000;
+const {SpeechSubtitles} = require('./subtitles/service');
+const {normalizeStyle} = require('./subtitles/style');
+let speech = null;
+let speechPendingWithChat=false;
+let speechStartedWithChat=false;
+const {OptionalRuntime}=require('./runtime/manager');
+let optionalRuntime=null;
+let shuttingDown=false;
+function startTranslation(device){
+  if(optionalRuntime.ready('translation')&&!optionalRuntime.state.busy)void commentTranslation.start(device);
+  else{commentTranslation.stop();commentTranslation.notify('コメント翻訳は未導入です。「コメント翻訳を導入」を押してください');}
+}
+function prepareOptionalRuntime(){
+  optionalRuntime=new OptionalRuntime(process.env.YT_OVERLAY_TEST_RUNTIME||path.join(app.getPath('userData'),'optional-runtime'),__dirname,app.isPackaged);
+  let wasBusy=false;
+  optionalRuntime.on('state',state=>{
+    if(shuttingDown)return;
+    if(wasBusy&&!state.busy&&speech){speech.state.gpuReady=optionalRuntime.ready('cuda');if(optionalRuntime.ready('speech')&&!speech.child)speech.prepare();}
+    wasBusy=state.busy;
+    if(isWindowAlive())mainWindow.webContents.send('runtime:state',state);
+  });
+  optionalRuntime.on('installed',kind=>{
+    if(shuttingDown)return;
+    if(kind==='translation'&&chatRequested&&loadTranslationSettings().enabled)setImmediate(()=>startTranslation(loadTranslationSettings().device));
+  });
+}
+ipcMain.handle('runtime:get-state',()=>optionalRuntime.state);
+ipcMain.handle('runtime:install',(_event,kind)=>{
+  if(!['speech','translation','cuda'].includes(kind))throw Error('未対応の機能です');
+  if(speech.state.running||commentTranslation.state.active)throw Error('字幕と翻訳を停止してから導入してください');
+  if(optionalRuntime.state.busy||optionalRuntime.ready(kind))return optionalRuntime.state;
+  // Release imported DLLs before pip updates the shared app-private environment.
+  speech.stop();commentTranslation.stop();
+  void optionalRuntime.install(kind);return optionalRuntime.state;
+});
+function speechSettingsPath() {return path.join(app.getPath('userData'),'speech-settings.json');}
+function normalizeSpeech(raw={}) {
+  const config=raw.config || {};
+  return {config:{microphone:/^\d+$/.test(String(config.microphone)) ? String(config.microphone) : '',
+    device:/^cuda:\d+$/.test(config.device) ? config.device : 'cpu',
+    model:['base','small','medium','large-v3'].includes(config.model) ? config.model : 'large-v3',
+    threshold:String(Math.max(0.3,Math.min(0.8,Number(config.threshold)||0.5)))},style:normalizeStyle(raw.style)};
+}
+function loadSpeechSettings() {
+  for (const file of [speechSettingsPath(),path.join(app.getPath('appData'),'live-subtitle-assistant','settings.json')]) {
+    try {return normalizeSpeech(JSON.parse(fs.readFileSync(file,'utf8')));} catch {}
+  }
+  return normalizeSpeech();
+}
+function prepareSpeech() {
+  const command=optionalRuntime.python;
+  const args=['-u',optionalRuntime.worker('speech')];
+  speech=new SpeechSubtitles(command,args,{windowsHide:true,cwd:app.getPath('userData'),
+    env:{...process.env,PYTHONUTF8:'1',SUBTITLE_MODEL_DIR:path.join(app.getPath('userData'),'models'),
+      SUBTITLE_SHARED_MODEL_DIR:path.join(app.getPath('appData'),'live-subtitle-assistant','models')}},loadSpeechSettings());
+  speech.on('state',state=>{
+    if(isWindowAlive()) mainWindow.webContents.send('speech:state',state);
+    if(speechPendingWithChat&&state.ready)setImmediate(startSpeechWithChat);
+  });
+  speech.state.gpuReady=optionalRuntime.ready('cuda');
+  if(optionalRuntime.ready('speech'))speech.prepare();else speech.state.status='音声字幕は未導入です。「音声字幕を導入」を押してください';
+}
+ipcMain.handle('speech:get-state',()=>speech.state);
+function startSpeech(raw){
+  if(optionalRuntime.state.busy)throw Error('導入が終わるまでお待ちください');
+  if (!speech.state.ready || speech.state.running) return speech.state;
+  const settings=normalizeSpeech(raw);
+  if(settings.config.device!=='cpu'&&!optionalRuntime.ready('cuda'))throw Error('「GPU高速化を導入」を押してください。CPUでも使用できます');
+  if (!speech.state.devices.some(device=>String(device.id)===settings.config.microphone)) throw new Error('マイクを選択してください');
+  if (settings.config.device!=='cpu' && !speech.state.gpus.some(gpu=>`cuda:${gpu.id}`===settings.config.device)) throw new Error('認識デバイスを選択してください');
+  fs.writeFileSync(speechSettingsPath(),JSON.stringify(settings)); speech.start(settings); return speech.state;
+}
+function startSpeechWithChat(){
+  if(!speechPendingWithChat||!chatRequested)return;
+  if(speech.state.running){speechPendingWithChat=false;return;}
+  if(!speech.state.ready)return;
+  speechPendingWithChat=false;
+  try{
+    startSpeech(speech.state.settings);
+    speechStartedWithChat=speech.state.running;
+  }catch(error){speech.state.status='字幕を開始できません: '+error.message;speech.publish();}
+}
+function requestSpeechWithChat(){
+  if(speech.state.running)return;
+  if(!optionalRuntime.ready('speech')||optionalRuntime.state.busy)return;
+  if(!speech.state.settings.config.microphone){
+    speech.state.status='音声字幕タブでマイクを選択すると、チャット取得開始と一緒に字幕も始まります';speech.publish();return;
+  }
+  speechPendingWithChat=true;
+  startSpeechWithChat();
+}
+function stopSpeechWithChat(){
+  speechPendingWithChat=false;
+  if(speechStartedWithChat){speechStartedWithChat=false;speech.stop(optionalRuntime.ready('speech'));}
+}
+ipcMain.handle('speech:start',(_event,raw)=>{speechPendingWithChat=false;return startSpeech(raw);});
+ipcMain.handle('speech:settings',(_event,raw)=>{
+  if(speech.state.running)return speech.state;
+  const settings=normalizeSpeech(raw);
+  fs.writeFileSync(speechSettingsPath(),JSON.stringify(settings));speech.update(settings);return speech.state;
+});
+ipcMain.handle('speech:stop',()=>{speechPendingWithChat=false;speechStartedWithChat=false;speech.stop(optionalRuntime.ready('speech'));return speech.state;});
+ipcMain.handle('speech:reload',()=>{if(!speech.state.running&&optionalRuntime.ready('speech')) speech.stop(true);return speech.state;});
+ipcMain.handle('speech:style',(_event,style)=>{
+  const settings={...speech.state.settings,style:normalizeStyle(style)};
+  fs.writeFileSync(speechSettingsPath(),JSON.stringify(settings));speech.update(settings);return speech.state;
+});
+ipcMain.handle('speech:clear',()=>{speech.clear();return speech.state;});
+ipcMain.handle('speech:copy-url',()=>{const url=`http://127.0.0.1:${OVERLAY_PORT}/subtitles`;clipboard.writeText(url);return url;});
 let mainWindow = null;
 let boundsSaveTimer = null;
 let currentColors = {
@@ -89,11 +253,12 @@ const DEFAULT_OBS_SETTINGS = {
   items: ["overlay", "niconico", "participantsVertical", "participantsHorizontal", "ohayo"],
 };
 const OBS_BROWSER_SOURCE_DEFS = [
+  {id:'subtitles',label:'日英音声字幕',inputName:'YT Overlay - Subtitles',url:`http://127.0.0.1:${OVERLAY_PORT}/subtitles`,width:1920,height:1080},
   {
     id: "overlay",
     label: "通常コメント",
     inputName: "YT Overlay - Comments",
-    url: "http://127.0.0.1:5000/",
+    url: `http://127.0.0.1:${OVERLAY_PORT}/`,
     width: 800,
     height: 600,
   },
@@ -101,7 +266,7 @@ const OBS_BROWSER_SOURCE_DEFS = [
     id: "niconico",
     label: "ニコニコ風",
     inputName: "YT Overlay - Niconico",
-    url: "http://127.0.0.1:5000/niconico",
+    url: `http://127.0.0.1:${OVERLAY_PORT}/niconico`,
     width: 1920,
     height: 1080,
   },
@@ -109,7 +274,7 @@ const OBS_BROWSER_SOURCE_DEFS = [
     id: "participantsVertical",
     label: "参加管理（縦並び）",
     inputName: "YT Overlay - Participants Vertical",
-    url: "http://127.0.0.1:5000/participants?layout=vertical",
+    url: `http://127.0.0.1:${OVERLAY_PORT}/participants?layout=vertical`,
     width: 520,
     height: 720,
   },
@@ -117,7 +282,7 @@ const OBS_BROWSER_SOURCE_DEFS = [
     id: "participantsHorizontal",
     label: "参加管理（横並び）",
     inputName: "YT Overlay - Participants Horizontal",
-    url: "http://127.0.0.1:5000/participants?layout=horizontal",
+    url: `http://127.0.0.1:${OVERLAY_PORT}/participants?layout=horizontal`,
     width: 1920,
     height: 300,
   },
@@ -125,7 +290,7 @@ const OBS_BROWSER_SOURCE_DEFS = [
     id: "ohayo",
     label: "おはよう",
     inputName: "YT Overlay - Ohayo",
-    url: "http://127.0.0.1:5000/ohayo",
+    url: `http://127.0.0.1:${OVERLAY_PORT}/ohayo`,
     width: 420,
     height: 140,
   },
@@ -769,6 +934,18 @@ function latestOhayoVideoId() {
 function createOverlayServer() {
   const srv = express();
 
+  srv.get('/subtitles',(_req,res)=>res.sendFile(path.join(__dirname,'subtitle-overlay.html')));
+  srv.get('/subtitle-events',(req,res)=>{
+    res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-cache');res.setHeader('Connection','keep-alive');res.flushHeaders();
+    // Level events are only needed by the controls, not the browser overlay.
+    const send=()=>res.write('data: '+JSON.stringify({subtitle:speech.state.subtitle,style:speech.state.style})+'\n\n');
+    let previous='';
+    const changed=()=>{const key=JSON.stringify([speech.state.subtitle,speech.state.style]);if(key!==previous){previous=key;send();}};
+    speech.on('state',changed);changed();
+    const heartbeat=setInterval(()=>res.write(': heartbeat\n\n'),15000);
+    req.on('close',()=>{clearInterval(heartbeat);speech.off('state',changed);});
+  });
+
   // Serve static assets (JS modules, CSS, etc.)
   srv.use(express.static(__dirname));
 
@@ -1103,6 +1280,10 @@ function createOverlayServer() {
     res.json(ohayoPayload(videoId));
   });
 
+  srv.get('/api/support-comments',async(req,res)=>{
+    const rows=await getSupportComments(String(req.query.video||''));
+    res.json(commentTranslation.decorate(rows));
+  });
   srv.get("/comments", async (req, res) => {
     const limit = parseInt(req.query.limit, 10);
     const after = parseInt(req.query.after, 10);
@@ -1182,7 +1363,7 @@ function createOverlayServer() {
           });
           syncParticipantsFromComments(withMeta);
           syncOhayoFromComments(withMeta);
-          return res.json(withMeta);
+          return res.json(commentTranslation ? commentTranslation.decorate(withMeta) : withMeta);
       }
     } catch (e) {
       console.warn("getRecentComments error:", e?.message || e);
@@ -1254,7 +1435,7 @@ function createOverlayServer() {
     });
     syncParticipantsFromComments(withMeta);
     syncOhayoFromComments(withMeta);
-    res.json(withMeta);
+    res.json(commentTranslation ? commentTranslation.decorate(withMeta) : withMeta);
   });
 
   // エフェクト手動トリガー API
@@ -1306,7 +1487,7 @@ function createOverlayServer() {
   });
 
   const server = http.createServer(srv);
-  server.listen(5000, "127.0.0.1", () => {
+  server.listen(OVERLAY_PORT, "127.0.0.1", () => {
     console.log("Overlay server listening on http://127.0.0.1:5000/");
   });
 }
@@ -1349,15 +1530,16 @@ function createObsLauncherFiles() {
     return filePath;
   };
 
-  makeLauncher("overlay-launcher.html", "http://127.0.0.1:5000/");
-  makeLauncher("niconico-launcher.html", "http://127.0.0.1:5000/niconico");
-  makeLauncher("supers-launcher.html", "http://127.0.0.1:5000/supers");
-  makeLauncher("participants-launcher.html", "http://127.0.0.1:5000/participants");
-  makeLauncher("participants-horizontal-launcher.html", "http://127.0.0.1:5000/participants?layout=horizontal");
-  makeLauncher("ohayo-launcher.html", "http://127.0.0.1:5000/ohayo");
-  makeLauncher("concurrent-launcher.html", "http://127.0.0.1:5000/concurrent");
-  makeLauncher("effects-launcher.html", "http://127.0.0.1:5000/effects");
-  makeLauncher("underrpg-launcher.html", "http://127.0.0.1:5000/rpgoverlay");
+  makeLauncher("overlay-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/`);
+  makeLauncher('subtitles-launcher.html', `http://127.0.0.1:${OVERLAY_PORT}/subtitles`);
+  makeLauncher("niconico-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/niconico`);
+  makeLauncher("supers-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/supers`);
+  makeLauncher("participants-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/participants`);
+  makeLauncher("participants-horizontal-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/participants?layout=horizontal`);
+  makeLauncher("ohayo-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/ohayo`);
+  makeLauncher("concurrent-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/concurrent`);
+  makeLauncher("effects-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/effects`);
+  makeLauncher("underrpg-launcher.html", `http://127.0.0.1:${OVERLAY_PORT}/rpgoverlay`);
 
   console.log("📁 OBS launcher files created in:", baseDir);
   return baseDir;
@@ -1402,6 +1584,7 @@ function createMainWindow(launchersDir) {
   const saved = loadWindowState();
 
   mainWindow = new BrowserWindow({
+    show: !process.env.YT_OVERLAY_TEST_USER_DATA,
     width: saved?.width || 1200,
     height: saved?.height || 620,
     x: saved?.x,
@@ -1447,6 +1630,12 @@ function createMainWindow(launchersDir) {
 
 // チャット開始
 ipcMain.on("chat:start", (event, payload) => {
+  if (chatRequested) return;
+  chatRequested = true;
+  const currentChatGeneration = ++chatGeneration;
+  requestSpeechWithChat();
+  const translation = loadTranslationSettings();
+  if (translation.enabled) startTranslation(translation.device);
   const inputStr = typeof payload === "object" && payload !== null
     ? String(payload.input || "")
     : String(payload || "");
@@ -1455,9 +1644,7 @@ ipcMain.on("chat:start", (event, payload) => {
     : loadObsSettings();
   console.log("IPC chat:start", inputStr);
 
-  if (isWindowAlive()) {
-    mainWindow.webContents.send("chat:status", "starting");
-  }
+  reportChatStatus('starting');
 
   refreshObsBrowserSources(obsSettings)
     .then((result) => {
@@ -1478,20 +1665,27 @@ ipcMain.on("chat:start", (event, payload) => {
       }
     });
 
-  startLiveChat(inputStr).catch((e) => {
+  startLiveChat(inputStr,status=>{
+    if(chatRequested&&currentChatGeneration===chatGeneration)reportChatStatus(status);
+  }).catch((e) => {
+    if (currentChatGeneration !== chatGeneration) return;
+    chatRequested = false;
+    stopSpeechWithChat();
+    commentTranslation.stop();
     console.error("startLiveChat error:", e);
+    reportChatStatus('stopped');
     if (isWindowAlive()) {
       mainWindow.webContents.send(
         "chat:error",
         e?.message || String(e)
       );
-      mainWindow.webContents.send("chat:status", "stopped");
     }
   });
 
   // 同時接続数のウォッチも並行で開始
   resolveVideoId(inputStr)
     .then((videoId) => {
+      if (!chatRequested || currentChatGeneration !== chatGeneration) return;
       if (videoId) {
         startConcurrentWatcher(videoId);
       } else {
@@ -1532,13 +1726,15 @@ ipcMain.handle("obs:add-sources", async (_event, settings) => {
 
 // チャット停止
 ipcMain.on("chat:stop", () => {
+  chatGeneration++;
+  chatRequested = false;
+  stopSpeechWithChat();
+  commentTranslation?.stop();
   console.log("IPC chat:stop");
   stopLiveChat();
   stopConcurrentWatcher();
 
-  if (isWindowAlive()) {
-    mainWindow.webContents.send("chat:status", "stopped");
-  }
+  reportChatStatus('stopped');
 });
 
 // ランチャーフォルダを開くボタン用
@@ -1570,6 +1766,9 @@ app.whenReady().then(() => {
   console.log("SQLite chat DB:", chatDbPath);
   loadParticipantState();
   loadOhayoState();
+  prepareOptionalRuntime();
+  prepareCommentTranslation();
+  prepareSpeech();
 
   createOverlayServer();
 
@@ -1586,6 +1785,10 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
+  shuttingDown=true;
+  optionalRuntime?.close();
+  speech?.stop();
+  commentTranslation?.stop();
   stopLiveChat();
   stopConcurrentWatcher();
   saveOhayoState();
@@ -1593,6 +1796,10 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
+  shuttingDown=true;
+  optionalRuntime?.close();
+  speech?.stop();
+  commentTranslation?.stop();
   stopLiveChat();
   stopConcurrentWatcher();
   saveOhayoState();
